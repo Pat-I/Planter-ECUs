@@ -1,47 +1,57 @@
-void RetrieveRowData()
-{
+void RetrieveRowData() {
+  //todo calculate speed (and speed differential lft right)
 
 
-  for(uint8_t i = 0; i< 16; i++)
-  {
-    if(sensorNewData[i])
-    {
-      sensorNewData[i] = 0; // ready for next time
+  for (uint8_t i = 0; i < numPlanterRows; i++) {
+    if (sensorNewData[i]) {
+      sensorNewData[i] = 0;  // ready for next time
       noInterrupts()
-      sensorSeedTimeStable[i] = sensorSeedTime[i];
+        sensorSeedTimeStable[i] = sensorSeedTime[i];
       interrupts()
 
-      sensorSeedDuration[i] = sensorSeedTimeStable[i] - lastSensorTime[i];
+        sensorSeedDuration = sensorSeedTimeStable[i] - lastSensorTime[i];
       lastSensorTime[i] = sensorSeedTimeStable[i];
-      if(sensorSeedDuration[i] < 500 && sensorSeedDuration[i] > 0)// valid data
+
+      if (sensorSeedDuration < 999 && sensorSeedDuration > 0)  // valid data
       {
-        
-        
-        if(!isRowSeeding[i])
-        {
-          if(sensorAllTimes[i][0] > 0)
-          {
-           // two seeds in a row
+        putArrayIndex = 0;
+        //check the array
+        if (sensorAllGapsIndex[i] > 99) putArrayIndex = sensorAllGapsIndex[i] - 100;
+
+
+        if (!isRowSeeding[i]) {
+          if (SeedPreviousDuration[i] < 250) {
+            // two seeds in a row
             isRowSeeding[i] = true;
           }
         }
-        
-        
-      }
-      else 
-      {
-      // too long, no seeding or under 0 no valid data
-       sensorSeedDuration[i] = 0;
-       //isRowSeeding[i] = false;
-      }
 
-      //add the data to the array
-      for(uint8_t j = 99; j >= 0; j--)
-      {
-        sensorAllTimes[i][j] = sensorAllTimes[i][j - 1];
-      }
-      sensorAllTimes[i][0] = sensorSeedDuration[i];
+        if (isRowRecoring[i] && ReceivedFirstSeed[i]) {
+          //we do not count the first gap after the seeder has been lowered
+
+          actualPlantSpacing = sensorSeedDuration * AOGSpeedX10;
+          actualPlantSpacing /= 36;
+
+          //put the data in the array
+          sensorAllGaps[i][putArrayIndex] = actualPlantSpacing;  //change to dist (seedDistancePut)
+          sensorAllSk[putArrayIndex] = 0;
+          sensorAllDbl[putArrayIndex] = 0;
+          sensorAllGapsIndex[i]++;
+          if (sensorAllGapsIndex[i] > 199) sensorAllGapsIndex[i] = 100;
+
+
+          if (actualPlantSpacing > (uint16_t)seedGapSkip) {
+            sk_skips[i]++;
+          }
+          if (actualPlantSpacing < (uint16_t)seedGapDouble) {
+            dbl_doubles[i]++;
+          }
+        }else{
+          ReceivedFirstSeed[i] =true;
+        }
+      }//end of "valid data"
+      SeedPreviousDuration[i] = sensorSeedDuration;
+
     }
   }
-
 }
