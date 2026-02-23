@@ -1,14 +1,25 @@
 
 
-char arduinoDate[] = "2025-01-26";
-char arduinoVersion[] = "v 1.0.0";
+char arduinoDate[] = "2026-02-23";
+char arduinoVersion[] = "v 1.0.1";
 
 /*
-population in seed/ha = (seed count x 472440945)/(time is ms x speed in (km/h)X10)
+This code use work from Jim from outfarming.com
+It send:
+PGN E1 and E2 (225 226) pop per row X1000 -> should change to spacing in mm 0 to 255
+PGN E3 and E4 (227 228) Doubles and Skips, 0 to 7 per row in the array time laps
+PGN E5 229 planter summary of the last 100 seeds from all active rows , popHaD10, SkipsPercentX100, DoublesPercentX100, SingulationPercentX100
+PGN E7 and E8 (231 232) singulation per row percent, the last 100 seeds
+
+also it should (to add) respond by E0 (224) when E0 is received
+is receive also E9 (233)
+
+It need:
+PGN EF (239) from AGO for speed and section status
+TO add: setions end speeds to do row compensation
+
 */
-//const uint32_t populationConstant = 472440945;
-//uint32_t PopulationCalc = 0; // PopulationCalc = populationConstant / time, then multi by seedCnt, then / speedX10
-//uint16_t RowPop[16];//max is 65 535 , >>4 divide by 16
+
 
 
 
@@ -300,7 +311,7 @@ void loop() {
         doublePlantSpacing = seedGap * 2;
       }
 
-      if (serialPgn == 233)  //E0 PlanterConfigData
+      if (serialPgn == 233)  //E9 PlanterConfigData
       {
         //byte 5
         planterSettings.rxArraySpeed = serialData[0];
