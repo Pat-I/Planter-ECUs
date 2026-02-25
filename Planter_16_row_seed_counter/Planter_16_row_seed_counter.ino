@@ -46,11 +46,17 @@ Storage planterSettings;  //14 bytes
 
 const uint8_t datazero = 0;
 
-uint8_t sin_data[] = { 0x80, 0x81, 0x7b, 0xE8, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
+uint8_t sin_data[] = { 0x80, 0x81, 0x7b, 0xED, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
 int16_t sin_dataSize = sizeof(sin_data);
 
-uint8_t sin2_data[] = { 0x80, 0x81, 0x7b, 0xE7, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
+uint8_t sin2_data[] = { 0x80, 0x81, 0x7b, 0xEC, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
 int16_t sin2_dataSize = sizeof(sin2_data);
+
+uint8_t space_data[] = { 0x80, 0x81, 0x7b, 0xEB, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
+int16_t space_dataSize = sizeof(space_data);
+
+uint8_t space2_data[] = { 0x80, 0x81, 0x7b, 0xEA, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
+int16_t space2_dataSize = sizeof(space2_data);
 
 uint8_t rc_data[] = { 0x80, 0x81, 0x7b, 0xE6, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
 int16_t rc_dataSize = sizeof(rc_data);
@@ -64,11 +70,11 @@ int16_t sk_dataSize = sizeof(sk_data);
 uint8_t dbl_data[] = { 0x80, 0x81, 0x7b, 0xE3, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
 int16_t dbl_dataSize = sizeof(dbl_data);
 
-uint8_t pop_data[] = { 0x80, 0x81, 0x7b, 0xE2, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
-int16_t pop_dataSize = sizeof(pop_data);
+//uint8_t pop_data[] = { 0x80, 0x81, 0x7b, 0xE2, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
+//int16_t pop_dataSize = sizeof(pop_data);
 
-uint8_t pop2_data[] = { 0x80, 0x81, 0x7b, 0xE1, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
-int16_t pop2_dataSize = sizeof(pop2_data);
+//uint8_t pop2_data[] = { 0x80, 0x81, 0x7b, 0xE1, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
+//int16_t pop2_dataSize = sizeof(pop2_data);
 
 uint8_t feedback[] = { 0x80, 0x81, 0x7b, 0xE0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
 int16_t feedbackSize = sizeof(rc_summary);
@@ -98,54 +104,53 @@ volatile uint32_t sensorSeedTime[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 uint32_t sensorSeedTimeStable[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };  //Actual time of seed detection but not volatile
 
 //storage variables
-float rowWidth = 76.2f;
+uint16_t rowWidth = 762; // in mm
 int numPlanterRows = 16;
-float doublesFactor = .29f;
-float targetPopulation = 84000.0f;
-float targetSpeed = 4.9f;
-float AOGSpeed = 0.0f;
+uint16_t doublesFactor = 29; 
+uint32_t targetPopulation = 84000; //per Ha
+//float targetSpeed = 4.9f;
+//float AOGSpeed = 0.0f;
 uint16_t AOGSpeedX10 = 0;
 int isMetric = 1;
-long seedGap = 0;
-long seedGapSkip = 0;
-long seedGapDouble = 0;
-uint16_t doublePlantSpacing = 0;
+uint32_t seedGap = 0;
+uint32_t seedGapSkip = 0;
+uint32_t seedGapDouble = 0;
+//uint16_t doublePlantSpacing = 0;
 uint32_t actualPlantSpacing = 0;
 
 uint16_t sensorSeedDuration;                                                           //time betwen 2 seeds
 uint16_t SeedPreviousDuration[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };  //time betwen 2 seeds
 uint16_t sensorAllGaps[16][100];
 uint8_t sensorAllGapsIndex[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-uint8_t putArrayIndex = 0;                                                  //just to use with sensorAllTimesIndex
+uint8_t putArrayIndex = 0;  //just to use with sensorAllTimesIndex
 uint8_t sensorAllSk[100];
 uint8_t sensorAllDbl[100];
 bool isRowSeeding[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };   //this is when at least 2 seeds dropped the last 500ms, to send back the section status
 bool isRowRecoring[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };  //this is went AOG command on and the planter is lowered.
 bool ReceivedFirstSeed[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 bool isPlanterLowered = true;
-uint8_t sectionStatus[] = {0,0};
+uint8_t sectionStatus[] = { 0, 0 };
 
-unsigned long millisSectionStatus = 0;
+uint8_t millisSectionStatus = 0;
 //Summary
-unsigned long millisAtSCount = 0;
+uint8_t millisAtSCount = 0;
 uint8_t SeedCount[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 uint8_t Skips[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 uint8_t Doubles[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 uint16_t avgSpacing[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 uint8_t singulation[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-uint16_t popDVD100[]  = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-float population[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-uint32_t sum_skipPercentX100 = 0;
-uint32_t sum_doublesPercentX100 = 0;
-uint32_t sum_singulationX100 = 0;
+//uint16_t popDVD100[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+uint32_t population[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+uint32_t sum_skipPercentX10 = 0;
+uint32_t sum_doublesPercentX10 = 0;
+uint32_t sum_singulationX10 = 0;
 uint32_t sum_populationD10 = 0;
 uint8_t byteIndex = 5;
 //skip double detail data
-unsigned long millisForArray = 5000;
+uint8_t millisForArray = 5;
 int sk_skips[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 int dbl_doubles[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-unsigned long millisAtSkipCount = 0;
-unsigned long millisAtDblCount = 0;
+uint8_t millisAtDblCount = 0;
 int sk_byteIndex = 12;
 int dbl_byteIndex = 12;
 
@@ -205,9 +210,10 @@ void loop() {
   if (currentTime - lastTime >= LOOP_TIME) {
     lastTime = currentTime;
 
-    //calculate the population, all the values to a 0, 5 minimum, check skip and double
-
-
+    millisSectionStatus++;
+    millisAtSCount++;
+    millisAtDblCount++;
+    
     //check if the rows are still seeding
     for (uint8_t i = 0; i < numPlanterRows; i++) {
       if (isRowSeeding[i]) {
@@ -220,7 +226,8 @@ void loop() {
       }
     }
     // check if a field is connected
-    if ((millis() - millisSectionStatus) > 250) {
+    if (millisSectionStatus > 3) {
+      millisSectionStatus = 0;  // wait 0.4 sec to do it again if still no connection
       for (uint8_t i = 0; i < numPlanterRows; i++) {
         isRowRecoring[i] = false;
         ReceivedFirstSeed[i] = false;
@@ -231,10 +238,18 @@ void loop() {
       }
     }
 
+    if (millisAtDblCount >= millisForArray) {
+      doubledetail();
+      skipdetail();
+      millisAtDblCount = 0;
+    }
 
-    doubledetail();
-    skipdetail();
-    Summary();
+    if (millisAtSCount >= 10) {
+      Summary();
+      millisAtSCount = 0;
+    }
+
+
   }  // end of 100 ms loop
 
   //This runs continuously, not timed //// Serial Receive Data/Settings /////////////////
@@ -295,20 +310,22 @@ void loop() {
         //Byte 12
         planterSettings.rxIsMetric = serialData[7];  // 184
         // conversions
-        numPlanterRows = (float)(planterSettings.rxNumPlanterRows);
-        targetSpeed = (float)(planterSettings.rxTargetSpeedX10) * 0.1f;
-        rowWidth = (float)(planterSettings.rxRowWidthX10Lo | planterSettings.rxRowWidthX10Hi << 8) * 0.1f;
-        targetPopulation = (float)((planterSettings.rxTargetPopulationLo | planterSettings.rxTargetPopulationHi << 8) * 10.0f);
-        doublesFactor = (float)(planterSettings.rxDoublesFactor) / 100.0f;
+        numPlanterRows = (planterSettings.rxNumPlanterRows);
+        //targetSpeed = (float)(planterSettings.rxTargetSpeedX10) * 0.1f;
+        rowWidth = (planterSettings.rxRowWidthX10Lo | planterSettings.rxRowWidthX10Hi << 8);
+        targetPopulation = (planterSettings.rxTargetPopulationLo | planterSettings.rxTargetPopulationHi << 8) * 10.0;
+        doublesFactor = planterSettings.rxDoublesFactor;
         isMetric = planterSettings.rxIsMetric;
 
         //seedGap = 3600000000.0f / ((float)targetPopulation * rowWidth * targetSpeed); //gap in ms = pop/HA x row cm x speed km/h
-        seedGap = 1000000000.0f / ((float)targetPopulation * rowWidth);  //gap in mm = pop/HA x row cm
+        seedGap = 10000000000 / (targetPopulation * rowWidth);  //gap in mm = pop/HA x row cm
 
 
-        seedGapSkip = seedGap * 1.8f;
-        seedGapDouble = seedGap * planterSettings.rxDoublesFactor / 100.0f;
-        doublePlantSpacing = seedGap * 2;
+        seedGapSkip = seedGap * 18;
+        seedGapSkip /= 10;
+        seedGapDouble = seedGap * doublesFactor;
+        seedGapDouble /=100;
+        //doublePlantSpacing = seedGap * 2;
       }
 
       if (serialPgn == 233)  //E9 PlanterConfigData
@@ -316,7 +333,7 @@ void loop() {
         //byte 5
         planterSettings.rxArraySpeed = serialData[0];
         // conversions
-        millisForArray = (int)planterSettings.rxArraySpeed * 1000;
+        millisForArray = planterSettings.rxArraySpeed;
       }
     }  // recv data
 
@@ -332,11 +349,11 @@ void loop() {
         AOGSpeedX10 = serialData[1];
 
         //AOGSpeedX10 = (planterSettings.rxSpeedHi | planterSettings.rxSpeedLo << 8);  //
-        AOGSpeed = (float)AOGSpeedX10 * 0.1f;  //
+        //AOGSpeed = (float)AOGSpeedX10 * 0.1f;  //
 
         sectionStatus[0] = serialData[6];
         sectionStatus[1] = serialData[7];
-        millisSectionStatus = millis();
+        millisSectionStatus = 0;
         CheckRowStatus();
       }
     }
@@ -349,7 +366,7 @@ void CheckRowStatus() {
   if (isPlanterLowered) {
     //check if section is on
     for (uint8_t i = 0; i < numPlanterRows; i++) {
-      uint8_t byteNbr = i/8;
+      uint8_t byteNbr = i / 8;
 
       isRowRecoring[i] = bitRead(sectionStatus[byteNbr], i - byteNbr * 8);
       if (!isRowRecoring[i]) ReceivedFirstSeed[i] = false;
@@ -376,8 +393,8 @@ void ISR1() {
   }
 }
 void ISR2() {
-  if ((millis() - sensorSeedTime[1]) > seedDebounceTime) {
-    sensorSeedTime[1] = millis();
-    sensorNewData[1] = 1;
+  if ((millis() - sensorSeedTime[2]) > seedDebounceTime) {
+    sensorSeedTime[2] = millis();
+    sensorNewData[2] = 1;
   }
 }

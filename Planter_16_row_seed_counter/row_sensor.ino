@@ -40,10 +40,10 @@ void RetrieveRowData() {
           if (sensorAllGapsIndex[i] > 199) sensorAllGapsIndex[i] = 100;
 
 
-          if (actualPlantSpacing > (uint16_t)seedGapSkip) {
+          if (actualPlantSpacing > seedGapSkip) {
             sk_skips[i]++;
           }
-          if (actualPlantSpacing < (uint16_t)seedGapDouble) {
+          if (actualPlantSpacing < seedGapDouble) {
             dbl_doubles[i]++;
           }
         }else{
