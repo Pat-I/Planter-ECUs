@@ -1,8 +1,8 @@
 
 
-char arduinoDate[] = "2026-02-26";
+char arduinoDate[] = "2026-03-01";
 char firmwareName[] = "JD1770NT main machine ECU";
-char arduinoVersion[] = "v 1.0.0";
+char arduinoVersion[] = "v 1.0.1";
 
 /*  PWM Frequency -> 
    *   490hz (default) = 0
@@ -17,8 +17,10 @@ unsigned long lastTime = LOOP_TIME;
 unsigned long currentTime = LOOP_TIME;
 
 //communication
-uint8_t CANreceiveBuffer[255];
-uint8_t CANreceiveErrorCnt = 0;
+uint8_t CANreceiveBuffer[8][255];
+uint8_t AOGtoCAN[255] = {0}; // Forces all elements to 0
+uint8_t AOGtoCANseq = 0;
+
 //define inputs and outputs
 #define PWM1_CYTRON 3
 #define DIR1_CYTRON 4
@@ -76,6 +78,8 @@ void loop() {
 
   if (currentTime - lastTime >= LOOP_TIME) {
     lastTime = currentTime;
+
+    CanCheckOldArray();
     analogRead(BOUTON_UP);
     analogWrite(PWM1_CYTRON, 128);
 
@@ -94,17 +98,19 @@ void loop() {
 }  // end of loop
 
 void CheckDataFromCAN() {
-  if (CANreceiveBuffer[0] == 1) {
-    CANreceiveBuffer[0] = 0;
-    switch (CANreceiveBuffer[1]) {
-      case 123:  //planter monitor, just forward
+  for (uint8_t i = 0; i < 8; i++) {
+    if (CANreceiveBuffer[i][0] == 1) {
+      CANreceiveBuffer[i][0] = 0;
+      switch (CANreceiveBuffer[i][3]) {
+        case 123:  //planter monitor, just forward
 
 
-        break;
+          break;
 
-      case 127:  //7F, from AOG
+        case 127:  //7F, from AOG
 
-        break;
+          break;
+      }
     }
   }
 }
