@@ -1,8 +1,10 @@
 void Summary() {
+  Serial1.print("ESP32-hello");  // for testing on AIO ESP32 slot
+  digitalWrite(13, HIGH);
 
   for (uint8_t i = 0; i < numPlanterRows; i++) {
 
-    uint8_t count = max(sensorAllGapsIndex[i], 99);
+    uint8_t count = min(sensorAllGapsIndex[i], 99);
     SeedCount[i] = count;
     Skips[i] = 0;
     Doubles[i] = 0;
@@ -20,50 +22,50 @@ void Summary() {
       avgSpacing[i] /= count;
       float sing = 100.0f * (count - (Skips[i] + Doubles[i])) / count;
       singulation[i] = (uint8_t)sing;
-      population[i] = 10000000000 / (avgSpacing[i] * rowWidth);
+      if (avgSpacing[i] > 0) population[i] = 10000000000 / (avgSpacing[i] * rowWidth);
       avgSpacing[i] = min(avgSpacing[i], 255);
     }
   }
-    /*
-    //build pop PGNs
-    for (int i = 0; i < numPlanterRows; i++) {
-      popDVD100[i] = population[i] / 100;  // to fit into 2 buffers
-    }
 
-    byteIndex = 5;
-    for (int i = 0; i < 8; i++) {
-      pop_data[byteIndex] += popDVD100[i];
-      byteIndex++;
-    }  // numPlanterRows
+  //build pop PGNs
+  for (int i = 0; i < numPlanterRows; i++) {
+    popDVD100[i] = population[i] / 100;  // to fit into 2 buffers
+  }
 
-    byteIndex = 5;
-    for (int i = 8; i < 16; i++) {
-      pop2_data[byteIndex] += popDVD100[i];
-      byteIndex++;
-    }  // numPlanterRows
+  byteIndex = 5;
+  for (int i = 0; i < 8; i++) {
+    pop_data[byteIndex] += popDVD100[i];
+    byteIndex++;
+  }  // numPlanterRows
 
-    int16_t CK_A = 0;
+  byteIndex = 5;
+  for (int i = 8; i < 16; i++) {
+    pop2_data[byteIndex] += popDVD100[i];
+    byteIndex++;
+  }  // numPlanterRows
 
-    for (int16_t i = 2; i < pop_dataSize - 1; i++) {
-      CK_A = (CK_A + pop_data[i]);
-    }
-    pop_data[pop_dataSize - 1] = CK_A;
-    Serial1.write(pop_data, pop_dataSize);
+  CK_A = 0;
 
-    CK_A = 0;
+  for (int16_t i = 2; i < pop_dataSize - 1; i++) {
+    CK_A = (CK_A + pop_data[i]);
+  }
+  pop_data[pop_dataSize - 1] = CK_A;
+  Serial1.write(pop_data, pop_dataSize);
 
-    for (int16_t i = 2; i < pop2_dataSize - 1; i++) {
-      CK_A = (CK_A + pop2_data[i]);
-    }
+  CK_A = 0;
 
-    pop2_data[pop2_dataSize - 1] = CK_A;
-    Serial1.write(pop2_data, pop2_dataSize);
+  for (int16_t i = 2; i < pop2_dataSize - 1; i++) {
+    CK_A = (CK_A + pop2_data[i]);
+  }
 
-    for (int k = 5; k < 13; k++) {
-      pop_data[k] = datazero;
-      pop2_data[k] = datazero;
-    }
-    */
+  pop2_data[pop2_dataSize - 1] = CK_A;
+  Serial1.write(pop2_data, pop2_dataSize);
+
+  for (int k = 5; k < 13; k++) {
+    pop_data[k] = datazero;
+    pop2_data[k] = datazero;
+  }
+
   //build the spacing PGNs
   byteIndex = 5;
   for (int i = 0; i < 8; i++) {
@@ -77,7 +79,7 @@ void Summary() {
     byteIndex++;
   }  // numPlanterRows
 
-  int16_t CK_A = 0;
+  CK_A = 0;
 
   for (int16_t i = 2; i < space_dataSize - 1; i++) {
     CK_A = (CK_A + space_data[i]);
@@ -159,8 +161,8 @@ void Summary() {
     sum_populationD10 /= 10;
   }
 
-  int16_t out_pop = (int)sum_populationD10;
-  Serial.println(out_pop);
+  uint16_t out_pop = sum_populationD10;
+
   rc_summary[5] = (uint8_t)out_pop;
   rc_summary[6] = out_pop >> 8;
 

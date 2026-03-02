@@ -16,7 +16,11 @@ void RetrieveRowData() {
       {
         putArrayIndex = 0;
         //check the array
-        if (sensorAllGapsIndex[i] > 99) putArrayIndex = sensorAllGapsIndex[i] - 100;
+        if (sensorAllGapsIndex[i] > 99) {
+          putArrayIndex = sensorAllGapsIndex[i] - 100;
+        } else {
+          putArrayIndex = sensorAllGapsIndex[i];
+        }
 
 
         if (!isRowSeeding[i]) {
@@ -46,12 +50,11 @@ void RetrieveRowData() {
           if (actualPlantSpacing < seedGapDouble) {
             dbl_doubles[i]++;
           }
-        }else{
-          ReceivedFirstSeed[i] =true;
+        } else {
+          ReceivedFirstSeed[i] = true;
         }
-      }//end of "valid data"
+      }  //end of "valid data"
       SeedPreviousDuration[i] = sensorSeedDuration;
-
     }
   }
 }

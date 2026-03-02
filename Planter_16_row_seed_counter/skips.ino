@@ -16,7 +16,7 @@ void skipdetail() {
     }
   }  // numPlanterRows
 
-  int16_t CK_A = 0;
+  CK_A = 0;
 
   for (int16_t i = 2; i < sk_dataSize - 1; i++) {
     CK_A = (CK_A + sk_data[i]);

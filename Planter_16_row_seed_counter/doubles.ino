@@ -19,7 +19,7 @@ void doubledetail() {
 
   }  // numPlanterRows
 
-  int16_t CK_A = 0;
+  CK_A = 0;
 
   for (int16_t m = 2; m < dbl_dataSize - 1; m++) {
     CK_A = (CK_A + dbl_data[m]);
