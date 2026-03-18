@@ -1,5 +1,5 @@
 void Summary() {
-  Serial1.print("ESP32-hello");  // for testing on AIO ESP32 slot
+  if(isTalkingToAiO) SerialPop.print("ESP32-hello");  // for testing on AIO ESP32 slot
   digitalWrite(13, HIGH);
 
   for (uint8_t i = 0; i < numPlanterRows; i++) {
@@ -23,10 +23,10 @@ void Summary() {
       float sing = 100.0f * (count - (Skips[i] + Doubles[i])) / count;
       singulation[i] = (uint8_t)sing;
       if (avgSpacing[i] > 0) population[i] = 10000000000 / (avgSpacing[i] * rowWidth);
-      avgSpacing[i] = min(avgSpacing[i], 255);
+      avgSpacing[i] = min((uint16_t)avgSpacing[i], 255);
     }
   }
-
+/*
   //build pop PGNs
   for (int i = 0; i < numPlanterRows; i++) {
     popDVD100[i] = population[i] / 100;  // to fit into 2 buffers
@@ -65,7 +65,7 @@ void Summary() {
     pop_data[k] = datazero;
     pop2_data[k] = datazero;
   }
-
+*/
   //build the spacing PGNs
   byteIndex = 5;
   for (int i = 0; i < 8; i++) {
@@ -85,7 +85,7 @@ void Summary() {
     CK_A = (CK_A + space_data[i]);
   }
   space_data[space_dataSize - 1] = CK_A;
-  Serial1.write(space_data, space_dataSize);
+  SerialPop.write(space_data, space_dataSize);
 
   CK_A = 0;
 
@@ -94,7 +94,7 @@ void Summary() {
   }
 
   space2_data[space2_dataSize - 1] = CK_A;
-  Serial1.write(space2_data, space2_dataSize);
+  SerialPop.write(space2_data, space2_dataSize);
 
   for (int k = 5; k < 13; k++) {
     space_data[k] = datazero;
@@ -118,14 +118,14 @@ void Summary() {
     CK_A = (CK_A + sin_data[i]);
   }
   sin_data[sin_dataSize - 1] = CK_A;
-  Serial1.write(sin_data, sin_dataSize);
+  SerialPop.write(sin_data, sin_dataSize);
 
   CK_A = 0;
   for (int16_t i = 2; i < sin2_dataSize - 1; i++) {
     CK_A = (CK_A + sin2_data[i]);
   }
   sin2_data[sin2_dataSize - 1] = CK_A;
-  Serial1.write(sin2_data, sin2_dataSize);
+  SerialPop.write(sin2_data, sin2_dataSize);
 
   for (int k = 5; k < 13; k++) {
     sin_data[k] = datazero;
@@ -161,7 +161,8 @@ void Summary() {
     sum_populationD10 /= 10;
   }
 
-  uint16_t out_pop = sum_populationD10;
+  uint16_t out_pop = 65535;
+  if (sum_populationD10 < 65535) out_pop =  sum_populationD10;
 
   rc_summary[5] = (uint8_t)out_pop;
   rc_summary[6] = out_pop >> 8;
@@ -185,5 +186,5 @@ void Summary() {
 
   rc_summary[rc_summarySize - 1] = CK_A;
 
-  Serial1.write(rc_summary, rc_summarySize);
+  SerialPop.write(rc_summary, rc_summarySize);
 }

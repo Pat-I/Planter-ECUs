@@ -23,7 +23,7 @@ void skipdetail() {
   }
 
   sk_data[sk_dataSize - 1] = CK_A;
-  Serial1.write(sk_data, sk_dataSize);
+  SerialPop.write(sk_data, sk_dataSize);
 
   for (int j = 0; j <= numPlanterRows; j++) {
     sk_skips[j] = 0;

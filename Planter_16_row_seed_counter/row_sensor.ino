@@ -32,12 +32,11 @@ void RetrieveRowData() {
 
         if (isRowRecoring[i] && ReceivedFirstSeed[i]) {
           //we do not count the first gap after the seeder has been lowered
-
-          actualPlantSpacing = sensorSeedDuration * AOGSpeedX10;
-          actualPlantSpacing /= 36;
+          // the spacing will overflow over 25.5km/h because of AOGSpeedX10
+          actualPlantSpacing = (sensorSeedDuration * (uint32_t)AOGSpeedX10) / 36;
 
           //put the data in the array
-          sensorAllGaps[i][putArrayIndex] = actualPlantSpacing;  //change to dist (seedDistancePut)
+          sensorAllGaps[i][putArrayIndex] = (uint16_t)actualPlantSpacing;
           sensorAllSk[putArrayIndex] = 0;
           sensorAllDbl[putArrayIndex] = 0;
           sensorAllGapsIndex[i]++;

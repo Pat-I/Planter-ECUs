@@ -18,8 +18,28 @@ unsigned long currentTime = LOOP_TIME;
 
 //communication
 uint8_t CANreceiveBuffer[8][255];
-uint8_t AOGtoCAN[255] = {0}; // Forces all elements to 0
+uint8_t AOGtoCAN[255] = { 0 };  // Forces all elements to 0
 uint8_t AOGtoCANseq = 0;
+
+///////main for the pop serial reading/////////////////////////////////////////////////////////
+#define SerialPop Serial1
+uint32_t bautPop = 460800;
+uint8_t popSerial_data[] = { 0x80, 0x81, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
+int16_t popSerial_dataSize = sizeof(popSerial_data);
+int16_t CK_A = 0;
+//Parsing PGN
+bool isHeaderFound = false;
+int16_t tempHeader = 0;
+bool isLengthFound = false;
+int header = 0;
+int temp = 0;
+uint8_t serialSource = 0;
+uint8_t serialPgn = 0;
+uint8_t serialLength = 0;
+uint8_t serialData[64];  //just to be sure it's long enough
+uint8_t serialCRC = 0;
+////////////////////////////////////////////////////////////////////////////////////////////
+
 
 //define inputs and outputs
 #define PWM1_CYTRON 3
@@ -49,6 +69,7 @@ void setup() {
     //analogWriteFrequency(PWM2_RPWM, 3921);
   }
   Serial.begin(115200);
+  SerialPop.begin(bautPop);
   //pinMode is only for digital pins?
   pinMode(BOUTON_UP, INPUT);  //INSTEAD INPUT_PULLUP, not needed?
   pinMode(BOUTON_DOWN, INPUT);
@@ -95,19 +116,101 @@ void loop() {
   CanDecode();
   //to add: read the CANreceiveBuffer
   CheckDataFromCAN();
+
+  //This runs continuously, not timed //// Serial Receive Data/Settings /////////////////
+  // if there's data available, read a packet
+
+  if (SerialPop.available() > 0 && !isHeaderFound) {
+    temp = SerialPop.read();
+    header = tempHeader << 8 | temp;            //high,low bytes to make int
+    tempHeader = temp;                          //save for next time
+    if (header == 32897) isHeaderFound = true;  //Do we have a match?
+  }
+
+  if (SerialPop.available() > 2 && isHeaderFound && !isLengthFound) {
+    serialSource = SerialPop.read();
+    serialPgn = SerialPop.read();
+    serialLength = SerialPop.read();
+    isLengthFound = true;
+  }
+
+  if (SerialPop.available() > serialLength && isHeaderFound && isLengthFound) {
+    //We have all data, reset for next time
+    isHeaderFound = false;
+    isLengthFound = false;
+
+    for (uint8_t i = 0; i < serialLength; i++) {
+      serialData[i] = SerialPop.read();
+    }
+    serialCRC = SerialPop.read();
+
+    //todo: check CRC, if bad, return, if good continue
+
+    //send to CAN3
+    AOGtoCAN[0] = 0x80;
+    AOGtoCAN[1] = 0x81;
+    AOGtoCAN[2] = serialSource;
+    AOGtoCAN[3] = serialPgn;
+    AOGtoCAN[4] = serialLength;
+    for (uint8_t i = 0; i < serialLength; i++) {
+      AOGtoCAN[i + 5] = serialData[i];
+    }
+    AOGtoCAN[serialLength + 5] = serialCRC;
+
+    EncodeAOGtoCAN();
+  }
+  /////////end of serial to CAN//////////////////////
 }  // end of loop
 
 void CheckDataFromCAN() {
   for (uint8_t i = 0; i < 8; i++) {
     if (CANreceiveBuffer[i][0] == 1) {
-      CANreceiveBuffer[i][0] = 0;
+      CANreceiveBuffer[i][0] = 0;  //read and ready to be re-used
+      //format:
+      //{ code, loopCounter, sequence, Source, Dest, lenght, Data......., CRC (only if data > 8)}
       switch (CANreceiveBuffer[i][3]) {
         case 123:  //planter monitor, just forward
 
+          if (CANreceiveBuffer[i][5] == 8) {  //standard 8 bytes message
+
+            for (uint8_t e = 2; e < 13; e++) {
+              popSerial_data[e] = CANreceiveBuffer[i][e + 1];
+            }
+            CK_A = 0;
+
+            for (int16_t i = 2; i < popSerial_dataSize - 1; i++) {
+              CK_A = (CK_A + popSerial_data[i]);
+            }
+
+            popSerial_data[popSerial_dataSize - 1] = CK_A;
+            SerialPop.write(popSerial_data, popSerial_dataSize);
+
+            for (int k = 5; k < 13; k++) {
+              popSerial_data[k] = 0;
+            }
+          }
 
           break;
 
         case 127:  //7F, from AOG
+          //forward 239 to pop serial.
+          if (CANreceiveBuffer[i][4] == 239) {
+            for (uint8_t e = 2; e < 13; e++) {
+              popSerial_data[e] = CANreceiveBuffer[i][e + 1];
+            }
+            CK_A = 0;
+
+            for (int16_t i = 2; i < popSerial_dataSize - 1; i++) {
+              CK_A = (CK_A + popSerial_data[i]);
+            }
+
+            popSerial_data[popSerial_dataSize - 1] = CK_A;
+            SerialPop.write(popSerial_data, popSerial_dataSize);
+
+            for (int k = 5; k < 13; k++) {
+              popSerial_data[k] = 0;
+            }
+          }
 
           break;
       }

@@ -9,7 +9,7 @@
 
 //8 bytes sentences sent in one message, without CRC
 //longer sentences are sent in multiple messages, 6 bytes per message, including first byte as the message lenght and the last as CRC
-//byte0: nbr/total
+//byte0: nbr/total (4bits / 4bits)
 //byte1: sequence nbr (same for the whole sequence)
 //byte2 to 7: payload
 
@@ -109,20 +109,23 @@ void CanCheckOldArray() {
 void EncodeAOGtoCAN() {
   //Input format: 0x80, 0x81, source, dest, lenght, data ........, CRC
   if (AOGtoCAN[2] > 0 && AOGtoCAN[3] > 0) {  //something to send
-    if (AOGtoCAN[2] <= 8) {                  //single sentence
+    uint8_t leng = min(AOGtoCAN[4], 245);
+    if (leng <= 8) {  //single sentence
       CanEncode(1, AOGtoCAN[2], AOGtoCAN[3], AOGtoCAN[5], AOGtoCAN[6], AOGtoCAN[7], AOGtoCAN[8], AOGtoCAN[9], AOGtoCAN[10], AOGtoCAN[11], AOGtoCAN[12]);
     } else {  //multiple sentences
       AOGtoCANseq++;
-      uint8_t leng = min(AOGtoCAN[4], 245);
       uint8_t NumberOfMessages = (leng + 1) / 6;
-    uint8_t messageNumber = (NumberOfMessages & 0x0F0) | ((1 & 0x0F) <<4);
-    //first message
-    //flag, source, dest, nbr/total, sequence, lenght, data 0-4
-    CanEncode(0, AOGtoCAN[2], AOGtoCAN[3], messageNumber , AOGtoCANseq, leng, AOGtoCAN[5], AOGtoCAN[6], AOGtoCAN[7], AOGtoCAN[8], AOGtoCAN[9]);
-    for(uint8_t i = 1; i < NumberOfMessages; i++){
-      messageNumber = (NumberOfMessages & 0x0F0) | (((i + 1) & 0x0F) <<4);
-      CanEncode(0, AOGtoCAN[2], AOGtoCAN[3], messageNumber , AOGtoCANseq, AOGtoCAN[i*6 +4], AOGtoCAN[i*6 +5], AOGtoCAN[i*6 +6], AOGtoCAN[i*6 +7], AOGtoCAN[i*6 +8], AOGtoCAN[i*6 +9]);
+      uint8_t messageNumber = (NumberOfMessages & 0x0F0) | ((1 & 0x0F) << 4);
+      //first message
+      //flag, source, dest, nbr/total, sequence, lenght, data 0-4
+      CanEncode(0, AOGtoCAN[2], AOGtoCAN[3], messageNumber, AOGtoCANseq, leng, AOGtoCAN[5], AOGtoCAN[6], AOGtoCAN[7], AOGtoCAN[8], AOGtoCAN[9]);
+      for (uint8_t i = 1; i < NumberOfMessages; i++) {
+        messageNumber = (NumberOfMessages & 0x0F0) | (((i + 1) & 0x0F) << 4);
+        CanEncode(0, AOGtoCAN[2], AOGtoCAN[3], messageNumber, AOGtoCANseq, AOGtoCAN[i * 6 + 4], AOGtoCAN[i * 6 + 5], AOGtoCAN[i * 6 + 6], AOGtoCAN[i * 6 + 7], AOGtoCAN[i * 6 + 8], AOGtoCAN[i * 6 + 9]);
+      }
     }
+    for(uint8_t j = 2; j < (leng + 6); j++){
+      AOGtoCAN[j] = 0;
     }
   }
 }

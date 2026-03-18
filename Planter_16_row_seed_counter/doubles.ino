@@ -26,7 +26,7 @@ void doubledetail() {
   }
 
   dbl_data[dbl_dataSize - 1] = CK_A;
-  Serial1.write(dbl_data, dbl_dataSize);
+  SerialPop.write(dbl_data, dbl_dataSize);
 
   for (int j = 0; j <= numPlanterRows; j++) {
     dbl_doubles[j] = 0;

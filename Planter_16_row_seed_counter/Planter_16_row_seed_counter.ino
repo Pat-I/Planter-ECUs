@@ -1,7 +1,7 @@
 
 
-char arduinoDate[] = "2026-02-23";
-char arduinoVersion[] = "v 1.0.1";
+char arduinoDate[] = "2026-03-14";
+char arduinoVersion[] = "v 1.0.2";
 
 /*
 This code use work from Jim from outfarming.com
@@ -22,7 +22,9 @@ TO add: setions end speeds to do row compensation
 
 
 
-
+#define SerialPop Serial1
+uint32_t bautPop = 460800;
+bool isTalkingToAiO = true; //set to true only if talking to the AiO ESP32 slot
 //loop time variables in milliseconds
 const byte LOOP_TIME = 100;  // 10Hz
 uint32_t lastTime = LOOP_TIME;
@@ -71,11 +73,11 @@ int16_t sk_dataSize = sizeof(sk_data);
 uint8_t dbl_data[] = { 0x80, 0x81, 0x7b, 0xE3, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
 int16_t dbl_dataSize = sizeof(dbl_data);
 
-uint8_t pop_data[] = { 0x80, 0x81, 0x7b, 0xE2, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
-int16_t pop_dataSize = sizeof(pop_data);
+//uint8_t pop_data[] = { 0x80, 0x81, 0x7b, 0xE2, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
+//int16_t pop_dataSize = sizeof(pop_data);
 
-uint8_t pop2_data[] = { 0x80, 0x81, 0x7b, 0xE1, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
-int16_t pop2_dataSize = sizeof(pop2_data);
+//uint8_t pop2_data[] = { 0x80, 0x81, 0x7b, 0xE1, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
+//int16_t pop2_dataSize = sizeof(pop2_data);
 
 uint8_t feedback[] = { 0x80, 0x81, 0x7b, 0xE0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
 int16_t feedbackSize = sizeof(feedback);
@@ -123,8 +125,8 @@ uint32_t seedGapDouble = 0;
 //uint16_t doublePlantSpacing = 0;
 uint32_t actualPlantSpacing = 0;
 
-uint16_t sensorSeedDuration;                                                           //time betwen 2 seeds
-uint16_t SeedPreviousDuration[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };  //time betwen 2 seeds
+uint32_t sensorSeedDuration;                                                           //time betwen 2 seeds
+uint32_t SeedPreviousDuration[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };  //time betwen 2 seeds
 uint16_t sensorAllGaps[16][100];
 uint8_t sensorAllGapsIndex[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 uint8_t putArrayIndex = 0;  //just to use with sensorAllTimesIndex
@@ -142,9 +144,9 @@ uint8_t millisAtSCount = 0;
 uint8_t SeedCount[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 uint8_t Skips[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 uint8_t Doubles[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-uint16_t avgSpacing[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+uint32_t avgSpacing[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 uint8_t singulation[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-uint16_t popDVD100[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+//uint16_t popDVD100[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 uint32_t population[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 uint32_t sum_skipPercentX10 = 0;
 uint32_t sum_doublesPercentX10 = 0;
@@ -163,7 +165,7 @@ void setup() {
   // put your setup code here, to run once:
   delay(100);
   Serial.begin(115200);
-  Serial1.begin(460800);
+  SerialPop.begin(bautPop);
 
   //delay(1000);
   delay(100);
@@ -262,29 +264,29 @@ void loop() {
   //This runs continuously, not timed //// Serial Receive Data/Settings /////////////////
   // if there's data available, read a packet
 
-  if (Serial1.available() > 0 && !isHeaderFound) {
-    temp = Serial1.read();
+  if (SerialPop.available() > 0 && !isHeaderFound) {
+    temp = SerialPop.read();
     header = tempHeader << 8 | temp;            //high,low bytes to make int
     tempHeader = temp;                          //save for next time
     if (header == 32897) isHeaderFound = true;  //Do we have a match?
   }
 
-  if (Serial1.available() > 2 && isHeaderFound && !isLengthFound) {
-    serialSource = Serial1.read();
-    serialPgn = Serial1.read();
-    serialLength = Serial1.read();
+  if (SerialPop.available() > 2 && isHeaderFound && !isLengthFound) {
+    serialSource = SerialPop.read();
+    serialPgn = SerialPop.read();
+    serialLength = SerialPop.read();
     isLengthFound = true;
   }
 
-  if (Serial1.available() > serialLength && isHeaderFound && isLengthFound) {
+  if (SerialPop.available() > serialLength && isHeaderFound && isLengthFound) {
     //We have all data, reset for next time
     isHeaderFound = false;
     isLengthFound = false;
 
     for (uint8_t i = 0; i < serialLength; i++) {
-      serialData[i] = Serial1.read();
+      serialData[i] = SerialPop.read();
     }
-    serialCRC = Serial1.read();
+    serialCRC = SerialPop.read();
 
     //todo: check CRC, if bad, return, if good continue
 
@@ -402,7 +404,7 @@ void SendRowStatus() {
 
   rowStatus[rowStatusSize - 1] = CK_A;
 
-  Serial1.write(rowStatus, rowStatusSize);
+  SerialPop.write(rowStatus, rowStatusSize);
 }
 
 void ISR0() {
