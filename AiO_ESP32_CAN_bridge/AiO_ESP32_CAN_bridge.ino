@@ -34,7 +34,7 @@ uint8_t AOGtoCANseq = 0;
 // Calculate CRC for PGN message
 uint8_t calculateCRC(uint8_t* buffer, uint8_t length) {
   uint8_t crc = 0;
-  for (int i = 0; i < length; i++) {
+  for (int i = 2; i < length; i++) {
     crc ^= buffer[i];
   }
   return crc;
