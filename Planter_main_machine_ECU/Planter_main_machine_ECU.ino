@@ -36,7 +36,7 @@ int temp = 0;
 uint8_t serialSource = 0;
 uint8_t serialPgn = 0;
 uint8_t serialLength = 0;
-uint8_t serialData[64];  //just to be sure it's long enough
+uint8_t serialData[256];  //just to be sure it's long enough
 uint8_t serialCRC = 0;
 ////////////////////////////////////////////////////////////////////////////////////////////
 
