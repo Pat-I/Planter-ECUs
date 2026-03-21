@@ -145,6 +145,8 @@ void sendStatusPGN() {
 void setup() {
   // Initialize serial for Teensy communication
   Serial.begin(460800);
+  Serial.setTxBufferSize(1024);
+  Serial.setRxBufferSize(1024);
   Caninit();
   // Small delay for serial to initialize
   delay(100);
@@ -199,8 +201,8 @@ void CheckDataFromCAN() {
 
       if (dataLen > 0) {
         //memcpy(&buffer[5], data, dataLen);
-        for (uint8_t j = 0; j < dataLen; j++){
-            buffer[j + 5] = CANreceiveBuffer[i][j + 6];
+        for (uint8_t j = 0; j < dataLen; j++) {
+          buffer[j + 5] = CANreceiveBuffer[i][j + 6];
         }
       }
 

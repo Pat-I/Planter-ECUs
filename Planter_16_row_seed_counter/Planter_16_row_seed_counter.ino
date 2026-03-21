@@ -24,6 +24,8 @@ TO add: setions end speeds to do row compensation
 
 #define SerialPop Serial1
 uint32_t bautPop = 460800;
+uint8_t popRxBuffer[2048];
+uint8_t popTxBuffer[2048];
 bool isTalkingToAiO = true; //set to true only if talking to the AiO ESP32 slot
 //loop time variables in milliseconds
 const byte LOOP_TIME = 100;  // 10Hz
@@ -166,6 +168,8 @@ void setup() {
   delay(100);
   Serial.begin(115200);
   SerialPop.begin(bautPop);
+  SerialPop.addMemoryForRead(popRxBuffer, sizeof(popRxBuffer));
+  SerialPop.addMemoryForWrite(popTxBuffer, sizeof(popTxBuffer));
 
   //delay(1000);
   delay(100);

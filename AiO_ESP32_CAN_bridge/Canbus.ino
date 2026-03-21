@@ -23,12 +23,12 @@ CanFrame RCV;
 
 void Caninit() {
   // or override everything in one command;
-    // It is also safe to use .begin() without .end() as it calls it internally
-    if(ESP32Can.begin(ESP32Can.convertSpeed(250), CAN_TX, CAN_RX, 10, 10)) {
-        Serial.println("CAN bus started!");
-    } else {
-        Serial.println("CAN bus failed!");
-    }
+  // It is also safe to use .begin() without .end() as it calls it internally
+  if (ESP32Can.begin(ESP32Can.convertSpeed(250), CAN_TX, CAN_RX, 10, 10)) {
+    Serial.println("CAN bus started!");
+  } else {
+    Serial.println("CAN bus failed!");
+  }
 }
 
 void CanDecode() {
@@ -40,7 +40,7 @@ void CanDecode() {
       break;
     }
   }
-  if (arrayNbr < 8) {         //we have an empty array
+  if (arrayNbr < 8) {                  //we have an empty array
     if (ESP32Can.readFrame(RCV, 0)) {  //received a sentence
       uint32_t id = RCV.identifier;
       uint8_t idflag = (id >> 16) & 0x01;
@@ -113,8 +113,8 @@ void CanCheckOldArray() {
 void EncodeAOGtoCAN() {
   //Input format: 0x80, 0x81, source, dest, lenght, data ........, CRC
   if (AOGtoCAN[2] > 0 && AOGtoCAN[3] > 0) {  //something to send
-    uint8_t leng = AOGtoCAN[4]; //min(AOGtoCAN[4], 245);
-    if (leng <= 8) {  //single sentence
+    uint8_t leng = min(AOGtoCAN[4], (uint8_t) 245);
+    if (leng <= 8) {                         //single sentence
       CanEncode(1, AOGtoCAN[2], AOGtoCAN[3], AOGtoCAN[5], AOGtoCAN[6], AOGtoCAN[7], AOGtoCAN[8], AOGtoCAN[9], AOGtoCAN[10], AOGtoCAN[11], AOGtoCAN[12]);
     } else {  //multiple sentences
       AOGtoCANseq++;
@@ -128,7 +128,7 @@ void EncodeAOGtoCAN() {
         CanEncode(0, AOGtoCAN[2], AOGtoCAN[3], messageNumber, AOGtoCANseq, AOGtoCAN[i * 6 + 4], AOGtoCAN[i * 6 + 5], AOGtoCAN[i * 6 + 6], AOGtoCAN[i * 6 + 7], AOGtoCAN[i * 6 + 8], AOGtoCAN[i * 6 + 9]);
       }
     }
-    for(uint8_t j = 2; j < (leng + 6); j++){
+    for (uint8_t j = 2; j < (leng + 6); j++) {
       AOGtoCAN[j] = 0;
     }
   }

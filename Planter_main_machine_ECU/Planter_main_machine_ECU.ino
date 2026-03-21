@@ -23,6 +23,8 @@ uint8_t AOGtoCANseq = 0;
 
 ///////main for the pop serial reading/////////////////////////////////////////////////////////
 #define SerialPop Serial1
+uint8_t popRxBuffer[2048];
+uint8_t popTxBuffer[2048];
 uint32_t bautPop = 460800;
 uint8_t popSerial_data[] = { 0x80, 0x81, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
 int16_t popSerial_dataSize = sizeof(popSerial_data);
@@ -70,6 +72,8 @@ void setup() {
   }
   Serial.begin(115200);
   SerialPop.begin(bautPop);
+  SerialPop.addMemoryForRead(popRxBuffer, sizeof(popRxBuffer));
+  SerialPop.addMemoryForWrite(popTxBuffer, sizeof(popTxBuffer));
   //pinMode is only for digital pins?
   pinMode(BOUTON_UP, INPUT);  //INSTEAD INPUT_PULLUP, not needed?
   pinMode(BOUTON_DOWN, INPUT);

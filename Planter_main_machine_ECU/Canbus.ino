@@ -124,7 +124,7 @@ void EncodeAOGtoCAN() {
         CanEncode(0, AOGtoCAN[2], AOGtoCAN[3], messageNumber, AOGtoCANseq, AOGtoCAN[i * 6 + 4], AOGtoCAN[i * 6 + 5], AOGtoCAN[i * 6 + 6], AOGtoCAN[i * 6 + 7], AOGtoCAN[i * 6 + 8], AOGtoCAN[i * 6 + 9]);
       }
     }
-    for(uint8_t j = 2; j < (leng + 6); j++){
+    for (uint8_t j = 2; j < (leng + 6); j++) {
       AOGtoCAN[j] = 0;
     }
   }
