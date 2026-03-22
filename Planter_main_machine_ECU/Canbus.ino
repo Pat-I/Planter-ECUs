@@ -133,7 +133,7 @@ void EncodeAOGtoCAN() {
 void CanEncode(uint8_t flag, uint8_t src, uint8_t dest, uint8_t data0, uint8_t data1, uint8_t data2, uint8_t data3, uint8_t data4, uint8_t data5, uint8_t data6, uint8_t data7) {
 
   //uint32_t id = dest | src << 8 | 1 << 16;
-  uint32_t id = (dest & 0xFF) | ((src & 0xFF) << 8) | (flag & 1 << 16);
+  uint32_t id = (dest & 0xFF) | ((src & 0xFF) << 8) | ((flag & 1) << 16);
   SendCan8.buf[0] = data0;
   SendCan8.buf[1] = data1;
   SendCan8.buf[2] = data2;

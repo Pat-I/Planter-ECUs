@@ -1,8 +1,8 @@
 
 
-char arduinoDate[] = "2026-03-01";
+char arduinoDate[] = "2026-03-21";
 char firmwareName[] = "JD1770NT main machine ECU";
-char arduinoVersion[] = "v 1.0.1";
+char arduinoVersion[] = "v 1.0.2";
 
 /*  PWM Frequency -> 
    *   490hz (default) = 0

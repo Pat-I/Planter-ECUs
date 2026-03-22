@@ -3,6 +3,7 @@
 // This demonstrates the basic structure needed to communicate with v26
 
 #include <Arduino.h>
+//#include "driver/twai.h" // Required for status functions
 
 // PGN Message structure
 struct PGNMessage {
@@ -35,7 +36,7 @@ uint8_t AOGtoCANseq = 0;
 uint8_t calculateCRC(uint8_t* buffer, uint8_t length) {
   uint8_t crc = 0;
   for (int i = 2; i < length; i++) {
-    crc ^= buffer[i];
+    crc += buffer[i];
   }
   return crc;
 }
@@ -56,13 +57,13 @@ void sendPGN(uint8_t source, uint8_t pgn, uint8_t* data, uint8_t dataLen) {
   uint8_t crc = calculateCRC(buffer, 5 + dataLen);
   buffer[5 + dataLen] = crc;
 
-  Serial.write(buffer, 6 + dataLen);
+  Serial1.write(buffer, 6 + dataLen);
 }
 
 // Parse incoming PGN messages
 void processIncomingData() {
-  while (Serial.available()) {
-    uint8_t byte = Serial.read();
+  while (Serial1.available()) {
+    uint8_t byte = Serial1.read();
 
     if (rxIndex < sizeof(rxBuffer)) {
       rxBuffer[rxIndex++] = byte;
@@ -88,6 +89,7 @@ void processIncomingData() {
               // Valid PGN received
               handlePGN(source, pgn, &rxBuffer[i + 5], dataLen);
               teensynDetected = true;
+              //Serial.println(pgn);
             }
 
             // Remove processed message from buffer
@@ -143,10 +145,12 @@ void sendStatusPGN() {
 }
 
 void setup() {
+  Serial.begin(460800);  //for usb
   // Initialize serial for Teensy communication
-  Serial.begin(460800);
-  Serial.setTxBufferSize(1024);
-  Serial.setRxBufferSize(1024);
+  // Serial1.begin(baud, config, RX_pin, TX_pin);
+Serial1.begin(460800, SERIAL_8N1, D7, D6);
+  Serial1.setTxBufferSize(1024);
+  Serial1.setRxBufferSize(1024);
   Caninit();
   // Small delay for serial to initialize
   delay(100);
@@ -159,8 +163,11 @@ void setup() {
 void loop() {
   // Send periodic hello message
   if (millis() - lastHelloTime > 5000) {  // Every 5 seconds
+    Serial1.print("ESP32-hello");
     Serial.print("ESP32-hello");
     lastHelloTime = millis();
+
+    //checkCANStatus();
   }
 
   // Process incoming serial data
@@ -190,7 +197,7 @@ void CheckDataFromCAN() {
       CANreceiveBuffer[i][0] = 0;  //read and ready to be re-used
                                    //format:
                                    // code, loopCounter, sequence, Source, Dest, lenght, Data......., CRC (only if data > 8)
-
+      Serial.println("F pop");
       uint8_t buffer[256];
       uint8_t dataLen = CANreceiveBuffer[i][5];
       buffer[0] = 0x80;
@@ -209,7 +216,29 @@ void CheckDataFromCAN() {
       uint8_t crc = calculateCRC(buffer, 5 + dataLen);
       buffer[5 + dataLen] = crc;
 
-      Serial.write(buffer, 6 + dataLen);
+      Serial1.write(buffer, 6 + dataLen);
     }
   }
 }
+/*
+void checkCANStatus() {
+  twai_status_info_t status;
+  if (twai_get_status_info(&status) == ESP_OK) {
+    Serial.print("CAN State: ");
+    switch (status.state) {
+      case TWAI_STATE_STOPPED: Serial.println("STOPPED"); break;
+      case TWAI_STATE_RUNNING: Serial.println("RUNNING"); break;
+      case TWAI_STATE_BUS_OFF: Serial.println("BUS-OFF (Hardware Error)"); break;
+      case TWAI_STATE_RECOVERING: Serial.println("RECOVERING"); break;
+    }
+    // Check error counters
+    Serial.printf("TX Errors: %d | RX Errors: %d\n", status.tx_error_counter, status.rx_error_counter);
+
+    // If Bus-Off, try to recover
+    if (status.state == TWAI_STATE_BUS_OFF) {
+      Serial.println("Initiating Recovery...");
+      twai_initiate_recovery();
+    }
+  }
+}
+*/

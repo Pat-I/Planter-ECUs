@@ -15,16 +15,25 @@
 
 #include <ESP32-TWAI-CAN.hpp>
 
-#define CAN_TX 6  // XIAO D6
-#define CAN_RX 7  // XIAO D7
+#define CAN_TX 2  // XIAO D6
+#define CAN_RX 3  // XIAO D7
 
-CanFrame SendCan8;
+//CanFrame SendCan8;
 CanFrame RCV;
 
 void Caninit() {
-  // or override everything in one command;
-  // It is also safe to use .begin() without .end() as it calls it internally
-  if (ESP32Can.begin(ESP32Can.convertSpeed(250), CAN_TX, CAN_RX, 10, 10)) {
+  ESP32Can.setPins(CAN_TX, CAN_RX);
+
+  // You can set custom size for the queues - those are default
+  ESP32Can.setRxQueueSize(5);
+  ESP32Can.setTxQueueSize(5);
+
+  // .setSpeed() and .begin() functions require to use TwaiSpeed enum,
+  // but you can easily convert it from numerical value using .convertSpeed()
+  ESP32Can.setSpeed(ESP32Can.convertSpeed(250));
+
+  // You can also just use .begin()..
+  if (ESP32Can.begin()) {
     Serial.println("CAN bus started!");
   } else {
     Serial.println("CAN bus failed!");
@@ -41,11 +50,13 @@ void CanDecode() {
     }
   }
   if (arrayNbr < 8) {                  //we have an empty array
-    if (ESP32Can.readFrame(RCV, 0)) {  //received a sentence
+    if (ESP32Can.readFrame(RCV, 1)) {  //received a sentence
       uint32_t id = RCV.identifier;
       uint8_t idflag = (id >> 16) & 0x01;
       uint8_t idSrc = (id >> 8) & 0xFF;
       uint8_t idDest = id & 0xFF;
+      Serial.print("PGN ");
+      Serial.println(idDest);
 
       if (idflag == 1) {                    //standard sentence
         CANreceiveBuffer[arrayNbr][0] = 1;  //this mean there's a sentence to read, must be set to 0 once read
@@ -98,6 +109,7 @@ void CanDecode() {
       }
     }
   }
+  else Serial.println("No free array");
 }
 
 void CanCheckOldArray() {
@@ -113,8 +125,8 @@ void CanCheckOldArray() {
 void EncodeAOGtoCAN() {
   //Input format: 0x80, 0x81, source, dest, lenght, data ........, CRC
   if (AOGtoCAN[2] > 0 && AOGtoCAN[3] > 0) {  //something to send
-    uint8_t leng = min(AOGtoCAN[4], (uint8_t) 245);
-    if (leng <= 8) {                         //single sentence
+    uint8_t leng = min(AOGtoCAN[4], (uint8_t)245);
+    if (leng <= 8) {  //single sentence
       CanEncode(1, AOGtoCAN[2], AOGtoCAN[3], AOGtoCAN[5], AOGtoCAN[6], AOGtoCAN[7], AOGtoCAN[8], AOGtoCAN[9], AOGtoCAN[10], AOGtoCAN[11], AOGtoCAN[12]);
     } else {  //multiple sentences
       AOGtoCANseq++;
@@ -137,7 +149,8 @@ void EncodeAOGtoCAN() {
 void CanEncode(uint8_t flag, uint8_t src, uint8_t dest, uint8_t data0, uint8_t data1, uint8_t data2, uint8_t data3, uint8_t data4, uint8_t data5, uint8_t data6, uint8_t data7) {
 
   //uint32_t id = dest | src << 8 | 1 << 16;
-  uint32_t id = (dest & 0xFF) | ((src & 0xFF) << 8) | (flag & 1 << 16);
+  CanFrame SendCan8  = { 0 };
+  uint32_t id = (dest & 0xFF) | ((src & 0xFF) << 8) | ((flag & 1) << 16);
   SendCan8.identifier = id;
   SendCan8.extd = 1;
   SendCan8.data_length_code = 8;
@@ -151,6 +164,5 @@ void CanEncode(uint8_t flag, uint8_t src, uint8_t dest, uint8_t data0, uint8_t d
   SendCan8.data[6] = data6;
   SendCan8.data[7] = data7;
 
-
-  ESP32Can.writeFrame(SendCan8, 0);
+  ESP32Can.writeFrame(SendCan8, 1);
 }
