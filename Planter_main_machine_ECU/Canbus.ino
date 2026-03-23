@@ -66,7 +66,11 @@ void CanDecode() {
 
         if (messageNbr == 1) {  //new message
           //write the message
-          CANreceiveBuffer[arrayNbr][0] = 2;            //this mean we are writing a longer PGN
+          if (messageTotal == 1){
+          CANreceiveBuffer[arrayNbr][0] = 1; //ready to seed
+          }else{
+            CANreceiveBuffer[arrayNbr][0] = 2; //this mean we are writing a longer PGN
+          }            
           CANreceiveBuffer[arrayNbr][1] = 0;            //loop counter
           CANreceiveBuffer[arrayNbr][2] = sequenceNbr;  //sequence nbr
           CANreceiveBuffer[arrayNbr][3] = idSrc;
@@ -115,12 +119,12 @@ void EncodeAOGtoCAN() {
     } else {  //multiple sentences
       AOGtoCANseq++;
       uint8_t NumberOfMessages = (leng + 1) / 6;
-      uint8_t messageNumber = (NumberOfMessages & 0x0F0) | ((1 & 0x0F) << 4);
+      uint8_t messageNumber = (NumberOfMessages & 0x0F) | ((1 & 0x0F) << 4);
       //first message
       //flag, source, dest, nbr/total, sequence, lenght, data 0-4
       CanEncode(0, AOGtoCAN[2], AOGtoCAN[3], messageNumber, AOGtoCANseq, leng, AOGtoCAN[5], AOGtoCAN[6], AOGtoCAN[7], AOGtoCAN[8], AOGtoCAN[9]);
       for (uint8_t i = 1; i < NumberOfMessages; i++) {
-        messageNumber = (NumberOfMessages & 0x0F0) | (((i + 1) & 0x0F) << 4);
+        messageNumber = (NumberOfMessages & 0x0F) | (((i + 1) & 0x0F) << 4);
         CanEncode(0, AOGtoCAN[2], AOGtoCAN[3], messageNumber, AOGtoCANseq, AOGtoCAN[i * 6 + 4], AOGtoCAN[i * 6 + 5], AOGtoCAN[i * 6 + 6], AOGtoCAN[i * 6 + 7], AOGtoCAN[i * 6 + 8], AOGtoCAN[i * 6 + 9]);
       }
     }

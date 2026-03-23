@@ -3,7 +3,7 @@
 // This demonstrates the basic structure needed to communicate with v26
 
 #include <Arduino.h>
-//#include "driver/twai.h" // Required for status functions
+#include "driver/twai.h"  // Required for status functions
 
 // PGN Message structure
 struct PGNMessage {
@@ -148,7 +148,7 @@ void setup() {
   Serial.begin(460800);  //for usb
   // Initialize serial for Teensy communication
   // Serial1.begin(baud, config, RX_pin, TX_pin);
-Serial1.begin(460800, SERIAL_8N1, D7, D6);
+  Serial1.begin(460800, SERIAL_8N1, D7, D6);
   Serial1.setTxBufferSize(1024);
   Serial1.setRxBufferSize(1024);
   Caninit();
@@ -156,7 +156,7 @@ Serial1.begin(460800, SERIAL_8N1, D7, D6);
   delay(100);
 
   // Send initial hello
-  Serial.print("ESP32-hello");
+  Serial1.print("ESP32-hello");
   lastHelloTime = millis();
 }
 
@@ -164,7 +164,6 @@ void loop() {
   // Send periodic hello message
   if (millis() - lastHelloTime > 5000) {  // Every 5 seconds
     Serial1.print("ESP32-hello");
-    Serial.print("ESP32-hello");
     lastHelloTime = millis();
 
     //checkCANStatus();
@@ -195,9 +194,9 @@ void CheckDataFromCAN() {
   for (uint8_t i = 0; i < 8; i++) {
     if (CANreceiveBuffer[i][0] == 1) {
       CANreceiveBuffer[i][0] = 0;  //read and ready to be re-used
-                                   //format:
-                                   // code, loopCounter, sequence, Source, Dest, lenght, Data......., CRC (only if data > 8)
-      Serial.println("F pop");
+
+      //format:
+      // code, loopCounter, sequence, Source, Dest, lenght, Data......., CRC (only if data > 8)
       uint8_t buffer[256];
       uint8_t dataLen = CANreceiveBuffer[i][5];
       buffer[0] = 0x80;
