@@ -49,7 +49,7 @@ struct Storage {
 Storage planterSettings;  //14 bytes
 
 const uint8_t datazero = 0;
-int16_t CK_A = 0;
+uint8_t CK_A = 0;
 
 uint8_t sin_data[] = { 0x80, 0x81, 0x7b, 0xCD, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
 int16_t sin_dataSize = sizeof(sin_data);
@@ -361,8 +361,8 @@ void loop() {
         //Byte 6
         //planterSettings.rxSpeedLo = serialData[1];
         AOGSpeedX10 = serialData[1];
-        Serial.print("Speed= ");
-        Serial.println(AOGSpeedX10);
+        //Serial.print("Speed= ");
+        //Serial.println(AOGSpeedX10);
 
         //AOGSpeedX10 = (planterSettings.rxSpeedHi | planterSettings.rxSpeedLo << 8);  //
         //AOGSpeed = (float)AOGSpeedX10 * 0.1f;  //

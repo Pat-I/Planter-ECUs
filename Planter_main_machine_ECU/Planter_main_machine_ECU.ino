@@ -28,7 +28,7 @@ uint8_t popTxBuffer[2048];
 uint32_t bautPop = 460800;
 uint8_t popSerial_data[] = { 0x80, 0x81, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
 int16_t popSerial_dataSize = sizeof(popSerial_data);
-int16_t CK_A = 0;
+uint8_t CK_A = 0;
 //Parsing PGN
 bool isHeaderFound = false;
 int16_t tempHeader = 0;
