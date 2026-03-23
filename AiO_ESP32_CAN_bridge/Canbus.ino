@@ -104,20 +104,7 @@ void CanDecode() {
         uint8_t messageTotal = RCV.data[0] & 0x0F;
         uint8_t sequenceNbr = RCV.data[1];
 
-        Serial.print("secquence= ");
-        Serial.print(sequenceNbr);
-        Serial.print(", src= ");
-        Serial.print(idSrc);
-        Serial.print(" , PGN= ");
-        Serial.print(idDest);
-        Serial.print(" , number= ");
-        Serial.print(messageNbr);
-        Serial.print(" , total= ");
-        Serial.print(messageTotal);
-
-
         if (messageNbr == 1) {  //new message
-        Serial.println(" , first");
           //write the message
           CANreceiveBuffer[arrayNbr][0] = 2;            //this mean we are writing a longer PGN
           CANreceiveBuffer[arrayNbr][1] = 0;            //loop counter
@@ -134,10 +121,8 @@ void CanDecode() {
               //It's the next message
               if (messageNbr < messageTotal) {
                 CANreceiveBuffer[k][0] = messageNbr + 1;
-                Serial.println(" , middle");
               } else {
                 CANreceiveBuffer[k][0] = 1;  //last part, read to read
-                Serial.println(" , last");
               }
               CANreceiveBuffer[k][1] = 0;  // reset loop counter
               for (uint8_t i = 2; i < 8; i++) {
@@ -199,10 +184,11 @@ void EncodeAOGtoCAN() {
 void CanEncode(uint8_t flag, uint8_t src, uint8_t dest, uint8_t data0, uint8_t data1, uint8_t data2, uint8_t data3, uint8_t data4, uint8_t data5, uint8_t data6, uint8_t data7) {
 
   //uint32_t id = dest | src << 8 | 1 << 16;
-  twai_message_t SendCan8;
+  twai_message_t SendCan8= {0};
   uint32_t id = (dest & 0xFF) | ((src & 0xFF) << 8) | ((flag & 1) << 16);
   SendCan8.identifier = id;
   SendCan8.extd = 1;
+  SendCan8.rtr = 0;
   SendCan8.data_length_code = 8;
 
   SendCan8.data[0] = data0;
