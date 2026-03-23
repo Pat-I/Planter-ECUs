@@ -298,6 +298,7 @@ void loop() {
     {
       if (serialPgn == 224)  //E0 PlanterConfigData
       {
+        Serial.println("config received");
         digitalToggle(13);
         //byte 5
         planterSettings.rxNumPlanterRows = serialData[0];  //16
@@ -360,6 +361,8 @@ void loop() {
         //Byte 6
         //planterSettings.rxSpeedLo = serialData[1];
         AOGSpeedX10 = serialData[1];
+        Serial.print("Speed= ");
+        Serial.println(AOGSpeedX10);
 
         //AOGSpeedX10 = (planterSettings.rxSpeedHi | planterSettings.rxSpeedLo << 8);  //
         //AOGSpeed = (float)AOGSpeedX10 * 0.1f;  //

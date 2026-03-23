@@ -36,6 +36,7 @@ void CanDecode() {
       break;
     }
   }
+  //CanCheckOldArray();
   if (arrayNbr < 8) {         //we have an empty array
     if (CanMain.read(RCV)) {  //received a sentence
       uint32_t id = RCV.id;
@@ -43,6 +44,14 @@ void CanDecode() {
       uint8_t idSrc = (id >> 8) & 0xFF;
       uint8_t idDest = id & 0xFF;
 
+/*
+        Serial.print(", src= ");
+        Serial.print(idSrc);
+        Serial.print(" , PGN= ");
+        Serial.print(idDest);
+        Serial.print(" , array= ");
+        Serial.println(arrayNbr);
+*/
       if (idflag == 1) {                    //standard sentence
         CANreceiveBuffer[arrayNbr][0] = 1;  //this mean there's a sentence to read, must be set to 0 once read
         CANreceiveBuffer[arrayNbr][1] = 0;  //loop counter
@@ -105,7 +114,7 @@ void CanCheckOldArray() {
   for (uint8_t k = 0; k < 8; k++) {
     if (CANreceiveBuffer[k][0] > 0) {
       CANreceiveBuffer[k][1]++;
-      if (CANreceiveBuffer[k][1] > 25) CANreceiveBuffer[k][0] = 0;  // array erased
+      if (CANreceiveBuffer[k][1] > 250) CANreceiveBuffer[k][0] = 0;  // array erased
     }
   }
 }

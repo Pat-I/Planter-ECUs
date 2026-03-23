@@ -166,7 +166,7 @@ void loop() {
     Serial1.print("ESP32-hello");
     lastHelloTime = millis();
 
-    //checkCANStatus();
+    checkCANStatus();
   }
 
   // Process incoming serial data
@@ -219,7 +219,7 @@ void CheckDataFromCAN() {
     }
   }
 }
-/*
+
 void checkCANStatus() {
   twai_status_info_t status;
   if (twai_get_status_info(&status) == ESP_OK) {
@@ -240,4 +240,3 @@ void checkCANStatus() {
     }
   }
 }
-*/
