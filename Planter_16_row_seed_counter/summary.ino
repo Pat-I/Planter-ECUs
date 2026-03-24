@@ -1,5 +1,5 @@
 void Summary() {
-  if(isTalkingToAiO) SerialPop.print("ESP32-hello");  // for testing on AIO ESP32 slot
+  if (isTalkingToAiO) SerialPop.print("ESP32-hello");  // for testing on AIO ESP32 slot
   digitalWrite(13, HIGH);
 
   for (uint8_t i = 0; i < numPlanterRows; i++) {
@@ -26,7 +26,8 @@ void Summary() {
       avgSpacing[i] = min((uint16_t)avgSpacing[i], 255);
     }
   }
-/*
+
+#ifdef SEND_POP_PGN
   //build pop PGNs
   for (int i = 0; i < numPlanterRows; i++) {
     popDVD100[i] = population[i] / 100;  // to fit into 2 buffers
@@ -65,7 +66,8 @@ void Summary() {
     pop_data[k] = datazero;
     pop2_data[k] = datazero;
   }
-*/
+#endif
+
   //build the spacing PGNs
   byteIndex = 5;
   for (int i = 0; i < 8; i++) {
@@ -162,7 +164,7 @@ void Summary() {
   }
 
   uint16_t out_pop = 65535;
-  if (sum_populationD10 < 65535) out_pop =  sum_populationD10;
+  if (sum_populationD10 < 65535) out_pop = sum_populationD10;
 
   rc_summary[5] = (uint8_t)out_pop;
   rc_summary[6] = out_pop >> 8;

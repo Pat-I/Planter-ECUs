@@ -1,22 +1,26 @@
 
 
-char arduinoDate[] = "2026-03-14";
-char arduinoVersion[] = "v 1.0.2";
+char arduinoDate[] = "2026-03-23";
+char arduinoVersion[] = "v 1.0.3";
 
+#define SERIAL_POP_COUNTER //show the number of seed passed per row in the serial monitor, 
+
+#define SEND_POP_PGN // send PGN 
 /*
 This code use work from Jim from outfarming.com
 It send:
-PGN E1 and E2 (225 226) pop per row X1000 -> should change to spacing in mm 0 to 255
+PGN E1 and E2 (225 226) pop per row X1000
+PGN CA and CB (202 203) spacing per row -> spacing in mm 0 to 255
+PGN CC and CD (204 205) singulation per row -> spacing in mm 0 to 100%
 PGN E3 and E4 (227 228) Doubles and Skips, 0 to 7 per row in the array time laps
-PGN E5 229 planter summary of the last 100 seeds from all active rows , popHaD10, SkipsPercentX100, DoublesPercentX100, SingulationPercentX100
-PGN E7 and E8 (231 232) singulation per row percent, the last 100 seeds
+PGN E5 229 planter summary of the last 100 seeds from all active rows , popHaD10, SkipsPercentX10, DoublesPercentX10, SingulationPercentX10
 
 also it should (to add) respond by E0 (224) when E0 is received
-is receive also E9 (233)
+it receive also E9 (233)
 
 It need:
 PGN EF (239) from AGO for speed and section status
-TO add: setions end speeds to do row compensation
+TO add:  real PGN 7FE5 (127,229)  (64 sections PGN) sections end speeds to do row side speed compensation
 
 */
 
@@ -75,11 +79,13 @@ int16_t sk_dataSize = sizeof(sk_data);
 uint8_t dbl_data[] = { 0x80, 0x81, 0x7b, 0xE3, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
 int16_t dbl_dataSize = sizeof(dbl_data);
 
-//uint8_t pop_data[] = { 0x80, 0x81, 0x7b, 0xE2, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
-//int16_t pop_dataSize = sizeof(pop_data);
+#ifdef SEND_POP_PGN
+uint8_t pop_data[] = { 0x80, 0x81, 0x7b, 0xE2, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
+int16_t pop_dataSize = sizeof(pop_data);
 
-//uint8_t pop2_data[] = { 0x80, 0x81, 0x7b, 0xE1, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
-//int16_t pop2_dataSize = sizeof(pop2_data);
+uint8_t pop2_data[] = { 0x80, 0x81, 0x7b, 0xE1, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
+int16_t pop2_dataSize = sizeof(pop2_data);
+#endif
 
 uint8_t feedback[] = { 0x80, 0x81, 0x7b, 0xE0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
 int16_t feedbackSize = sizeof(feedback);
@@ -131,7 +137,6 @@ uint32_t sensorSeedDuration;                                                    
 uint32_t SeedPreviousDuration[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };  //time betwen 2 seeds
 uint16_t sensorAllGaps[16][100];
 uint8_t sensorAllGapsIndex[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-uint8_t putArrayIndex = 0;  //just to use with sensorAllTimesIndex
 uint8_t sensorAllSk[100];
 uint8_t sensorAllDbl[100];
 bool isRowSeeding[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };   //this is when at least 2 seeds dropped the last 500ms, to send back the section status
@@ -142,13 +147,18 @@ uint8_t sectionStatus[] = { 0, 0 };
 
 uint8_t millisSectionStatus = 0;
 //Summary
+#ifdef SERIAL_POP_COUNTER
+uint16_t SeedCountTotal[16];
+#endif
 uint8_t millisAtSCount = 0;
 uint8_t SeedCount[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 uint8_t Skips[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 uint8_t Doubles[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 uint32_t avgSpacing[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 uint8_t singulation[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-//uint16_t popDVD100[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+#ifdef SEND_POP_PGN
+uint16_t popDVD100[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+#endif
 uint32_t population[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 uint32_t sum_skipPercentX10 = 0;
 uint32_t sum_doublesPercentX10 = 0;
@@ -260,6 +270,42 @@ void loop() {
     if (millisAtSCount >= 10) {
       Summary();
       millisAtSCount = 0;
+
+      //once per second
+      #ifdef SERIAL_POP_COUNTER
+      Serial.print("row1= ");
+      Serial.print(SeedCountTotal[0]);
+      Serial.print(", row2= ");
+      Serial.print(SeedCountTotal[1]);
+      Serial.print(", row3= ");
+      Serial.print(SeedCountTotal[2]);
+      Serial.print(", row4= ");
+      Serial.print(SeedCountTotal[3]);
+      Serial.print(", row5= ");
+      Serial.print(SeedCountTotal[4]);
+      Serial.print(", row6= ");
+      Serial.print(SeedCountTotal[5]);
+      Serial.print(", row7= ");
+      Serial.print(SeedCountTotal[6]);
+      Serial.print(", row8= ");
+      Serial.print(SeedCountTotal[7]);
+      Serial.print(", row9= ");
+      Serial.print(SeedCountTotal[8]);
+      Serial.print(", row10= ");
+      Serial.print(SeedCountTotal[9]);
+      Serial.print(", row11= ");
+      Serial.print(SeedCountTotal[10]);
+      Serial.print(", row12= ");
+      Serial.print(SeedCountTotal[11]);
+      Serial.print(", row13= ");
+      Serial.print(SeedCountTotal[12]);
+      Serial.print(", row14= ");
+      Serial.print(SeedCountTotal[13]);
+      Serial.print(", row15= ");
+      Serial.print(SeedCountTotal[14]);
+      Serial.print(", row16= ");
+      Serial.println(SeedCountTotal[15]);
+      #endif
     }
 
 

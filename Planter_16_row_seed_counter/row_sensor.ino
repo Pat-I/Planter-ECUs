@@ -5,23 +5,23 @@ void RetrieveRowData() {
   for (uint8_t i = 0; i < numPlanterRows; i++) {
     if (sensorNewData[i]) {
       sensorNewData[i] = 0;  // ready for next time
-      noInterrupts()
-        sensorSeedTimeStable[i] = sensorSeedTime[i];
-      interrupts()
+      noInterrupts();
+      sensorSeedTimeStable[i] = sensorSeedTime[i];
+      interrupts();
 
-        sensorSeedDuration = sensorSeedTimeStable[i] - lastSensorTime[i];
+      #ifdef SERIAL_POP_COUNTER
+      SeedCountTotal[i]++;
+      Serial.print("seed on row ");
+      Serial.println((i + 1));
+      #endif
+
+      sensorSeedDuration = sensorSeedTimeStable[i] - lastSensorTime[i];
       lastSensorTime[i] = sensorSeedTimeStable[i];
 
       if (sensorSeedDuration < 999 && sensorSeedDuration > 0)  // valid data
       {
-        putArrayIndex = 0;
         //check the array
-        if (sensorAllGapsIndex[i] > 99) {
-          putArrayIndex = sensorAllGapsIndex[i] - 100;
-        } else {
-          putArrayIndex = sensorAllGapsIndex[i];
-        }
-
+        uint8_t putArrayIndex = sensorAllGapsIndex[i] % 100;
 
         if (!isRowSeeding[i]) {
           if (SeedPreviousDuration[i] < 250) {
