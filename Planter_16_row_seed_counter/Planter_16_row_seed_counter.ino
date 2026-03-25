@@ -3,9 +3,9 @@
 char arduinoDate[] = "2026-03-23";
 char arduinoVersion[] = "v 1.0.3";
 
-#define SERIAL_POP_COUNTER //show the number of seed passed per row in the serial monitor, 
+#define SERIAL_POP_COUNTER  //show the number of seed passed per row in the serial monitor,
 
-#define SEND_POP_PGN // send PGN 
+//#define SEND_POP_PGN  // send PGN
 /*
 This code use work from Jim from outfarming.com
 It send:
@@ -30,7 +30,7 @@ TO add:  real PGN 7FE5 (127,229)  (64 sections PGN) sections end speeds to do ro
 uint32_t bautPop = 460800;
 uint8_t popRxBuffer[2048];
 uint8_t popTxBuffer[2048];
-bool isTalkingToAiO = true; //set to true only if talking to the AiO ESP32 slot
+bool isTalkingToAiO = true;  //set to true only if talking to the AiO ESP32 slot
 //loop time variables in milliseconds
 const byte LOOP_TIME = 100;  // 10Hz
 uint32_t lastTime = LOOP_TIME;
@@ -51,6 +51,16 @@ struct Storage {
   uint8_t rxArraySpeed = 1;
 };
 Storage planterSettings;  //14 bytes
+
+#ifdef SERIAL_POP_COUNTER
+//teensy usage calc
+uint32_t cycles_max = 0;    // Référence (CPU à 0%)
+uint32_t compteur = 0;      // Compteur actuel
+uint32_t timer_mesure = 0;  // Chronomètre
+#endif
+//Used to set CPU speed
+extern "C" uint32_t set_arm_clock(uint32_t frequency);
+extern float tempmonGetTemp(void);
 
 const uint8_t datazero = 0;
 uint8_t CK_A = 0;
@@ -111,7 +121,7 @@ uint8_t PinIN[] = { 34, 33, 36, 35, 38, 37, 40, 39, 14, 41, 16, 15, 18, 17, 20, 
 
 
 //Sensor logic
-uint32_t seedDebounceTime = 3;                                                           //Debounce time in ms after seed detection, 3ms is about the time a seed passes by?
+uint32_t seedDebounceTime = 2;                                                            //Debounce time in ms after seed detection, 3ms is about the time a seed passes by?
 volatile bool sensorNewData[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };       //A seed has been read
 uint32_t lastSensorTime[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };           //previous time
 volatile uint32_t sensorSeedTime[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };  //Actual time of seed detection
@@ -174,8 +184,24 @@ int sk_byteIndex = 12;
 int dbl_byteIndex = 12;
 
 void setup() {
+  // Core at 150 MHz (To reduce heat)
+  set_arm_clock(150000000);
   // put your setup code here, to run once:
   delay(100);
+  Serial.print("CPU speed set to: ");
+  Serial.println(F_CPU_ACTUAL);
+
+#ifdef SERIAL_POP_COUNTER
+  // 1. Calibration : Compter les boucles vides pendant 500ms
+  uint32_t start = millis();
+  while (millis() - start < 1000) {
+    compteur++;
+  }
+  cycles_max = compteur;  // On a notre 100% de repos
+  compteur = 0;
+  timer_mesure = millis();
+#endif
+
   Serial.begin(115200);
   SerialPop.begin(bautPop);
   SerialPop.addMemoryForRead(popRxBuffer, sizeof(popRxBuffer));
@@ -220,13 +246,76 @@ void setup() {
   Serial.println("Planter Seed Counter");
   Serial.println(arduinoVersion);
   Serial.println(arduinoDate);
+
+  Serial.print("Score de repos : ");
+  Serial.println(cycles_max);
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
 
+
   //Loop triggers every 100 msec
   currentTime = millis();
+
+#ifdef SERIAL_POP_COUNTER
+  compteur++;  // Load calculator
+
+  if (millis() - timer_mesure >= 1000) {
+    // Calcul de l'inactivité : (cycles actuels / cycles max) * 100
+    float idle = (float)compteur / (float)cycles_max;
+    idle *= 100;
+    float charge = 100.0 - idle;
+    timer_mesure = millis();
+
+    if (charge < 0) charge = 0;  // Ajustement si légère fluctuation
+
+    Serial.print("row1= ");
+    Serial.print(SeedCountTotal[0]);
+    Serial.print(", row2= ");
+    Serial.print(SeedCountTotal[1]);
+    Serial.print(", row3= ");
+    Serial.print(SeedCountTotal[2]);
+    Serial.print(", row4= ");
+    Serial.print(SeedCountTotal[3]);
+    Serial.print(", row5= ");
+    Serial.print(SeedCountTotal[4]);
+    Serial.print(", row6= ");
+    Serial.print(SeedCountTotal[5]);
+    Serial.print(", row7= ");
+    Serial.print(SeedCountTotal[6]);
+    Serial.print(", row8= ");
+    Serial.print(SeedCountTotal[7]);
+    Serial.print(", row9= ");
+    Serial.print(SeedCountTotal[8]);
+    Serial.print(", row10= ");
+    Serial.print(SeedCountTotal[9]);
+    Serial.print(", row11= ");
+    Serial.print(SeedCountTotal[10]);
+    Serial.print(", row12= ");
+    Serial.print(SeedCountTotal[11]);
+    Serial.print(", row13= ");
+    Serial.print(SeedCountTotal[12]);
+    Serial.print(", row14= ");
+    Serial.print(SeedCountTotal[13]);
+    Serial.print(", row15= ");
+    Serial.print(SeedCountTotal[14]);
+    Serial.print(", row16= ");
+    Serial.print(SeedCountTotal[15]);
+
+    Serial.print(", CPU : ");
+    
+    Serial.print(charge);
+    Serial.print(" %");
+
+    compteur = 0;
+
+    float celsius = tempmonGetTemp();
+    Serial.print(", T: ");
+    Serial.print(celsius);
+    Serial.println(" °C");
+  }
+#endif
 
   if (currentTime - lastTime >= LOOP_TIME) {
     lastTime = currentTime;
@@ -270,45 +359,7 @@ void loop() {
     if (millisAtSCount >= 10) {
       Summary();
       millisAtSCount = 0;
-
-      //once per second
-      #ifdef SERIAL_POP_COUNTER
-      Serial.print("row1= ");
-      Serial.print(SeedCountTotal[0]);
-      Serial.print(", row2= ");
-      Serial.print(SeedCountTotal[1]);
-      Serial.print(", row3= ");
-      Serial.print(SeedCountTotal[2]);
-      Serial.print(", row4= ");
-      Serial.print(SeedCountTotal[3]);
-      Serial.print(", row5= ");
-      Serial.print(SeedCountTotal[4]);
-      Serial.print(", row6= ");
-      Serial.print(SeedCountTotal[5]);
-      Serial.print(", row7= ");
-      Serial.print(SeedCountTotal[6]);
-      Serial.print(", row8= ");
-      Serial.print(SeedCountTotal[7]);
-      Serial.print(", row9= ");
-      Serial.print(SeedCountTotal[8]);
-      Serial.print(", row10= ");
-      Serial.print(SeedCountTotal[9]);
-      Serial.print(", row11= ");
-      Serial.print(SeedCountTotal[10]);
-      Serial.print(", row12= ");
-      Serial.print(SeedCountTotal[11]);
-      Serial.print(", row13= ");
-      Serial.print(SeedCountTotal[12]);
-      Serial.print(", row14= ");
-      Serial.print(SeedCountTotal[13]);
-      Serial.print(", row15= ");
-      Serial.print(SeedCountTotal[14]);
-      Serial.print(", row16= ");
-      Serial.println(SeedCountTotal[15]);
-      #endif
     }
-
-
   }  // end of 100 ms loop
 
   //This runs continuously, not timed //// Serial Receive Data/Settings /////////////////
