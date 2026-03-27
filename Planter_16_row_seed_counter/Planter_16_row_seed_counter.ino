@@ -1,9 +1,9 @@
 
 
-char arduinoDate[] = "2026-03-23";
-char arduinoVersion[] = "v 1.0.3";
+char arduinoDate[] = "2026-03-27";
+char arduinoVersion[] = "v 1.0.4";
 
-#define SERIAL_POP_COUNTER  //show the number of seed passed per row in the serial monitor,
+//#define SERIAL_POP_COUNTER  //show the number of seed passed per row in the serial monitor,
 
 //#define SEND_POP_PGN  // send PGN
 /*
@@ -100,7 +100,7 @@ int16_t pop2_dataSize = sizeof(pop2_data);
 uint8_t feedback[] = { 0x80, 0x81, 0x7b, 0xE0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
 int16_t feedbackSize = sizeof(feedback);
 
-uint8_t rowStatus[] = { 0x80, 0x81, 0x7b, 0xF0, 8, 1, 0, 0, 0, 0, 0, 0, 0, 15 };
+uint8_t rowStatus[] = { 0x80, 0x81, 0x7b, 0xF0, 4, 1, 0, 0, 0, 15 };// for 16 row only
 int16_t rowStatusSize = sizeof(rowStatus);
 
 //Parsing PGN
@@ -118,7 +118,6 @@ uint8_t serialCRC = 0;
 //Pins
 //Sensor Pins
 uint8_t PinIN[] = { 34, 33, 36, 35, 38, 37, 40, 39, 14, 41, 16, 15, 18, 17, 20, 19 };
-
 
 //Sensor logic
 uint32_t seedDebounceTime = 2;                                                            //Debounce time in ms after seed detection, 3ms is about the time a seed passes by?
@@ -246,14 +245,14 @@ void setup() {
   Serial.println("Planter Seed Counter");
   Serial.println(arduinoVersion);
   Serial.println(arduinoDate);
-
+#ifdef SERIAL_POP_COUNTER
   Serial.print("Score de repos : ");
   Serial.println(cycles_max);
+#endif
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
-
 
   //Loop triggers every 100 msec
   currentTime = millis();
@@ -304,7 +303,7 @@ void loop() {
     Serial.print(SeedCountTotal[15]);
 
     Serial.print(", CPU : ");
-    
+
     Serial.print(charge);
     Serial.print(" %");
 
@@ -494,7 +493,7 @@ void CheckRowStatus() {
 }
 
 void SendRowStatus() {
-  //uint8_t rowStatus[] = { 0x80, 0x81, 0x7b, 0xF0, 8, stat, sect, 1to8, 9to16, 0, 0, 0, 0, 15 };
+  //uint8_t rowStatus[] = { 0x80, 0x81, 0x7b, 0xF0, 4, stat, sect, 1to8, 9to16, 15 };
   //int16_t rowStatusSize = sizeof(rowStatus);
   rowStatus[6] = numPlanterRows;
   for (uint8_t i = 0; i < numPlanterRows; i++) {

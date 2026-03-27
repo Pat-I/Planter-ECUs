@@ -5,9 +5,10 @@
 // EncodeAOGtoCAN(): to send the AOGtoCAN[] array over canbus
 // Caninit();   add to main Setup  after doSetup()
 
-//id is 3 bytes: first (highest) is 1 for std 8 byte AOG sentence, 0 for multiple one, second (middle) byte is source, third (smallest) is destination
+//id is 3 bytes, 18bits, 19 to 26 are 0s: first (highest) is: 2 for payloads of less than 8 bytes, 1 for std 8 byte AOG sentence, 0 for multiple one, second (middle) byte is source, third (smallest) is destination
 
-//8 bytes sentences sent in one message, without CRC
+//8 bytes or less sentences sent in one message, without CRC
+//8 bytes sentence don't send length, 7 and less, the first byte is the payload lenght
 //longer sentences are sent in multiple messages, 6 bytes per message, including first byte as the message lenght and the last as CRC
 //byte0: nbr/total (4bits / 4bits)
 //byte1: sequence nbr (same for the whole sequence)
@@ -22,23 +23,6 @@
 twai_message_t RCV;
 
 void Caninit() {
-  //ESP32Can.setPins(CAN_TX, CAN_RX);
-
-  // You can set custom size for the queues - those are default
-  //ESP32Can.setRxQueueSize(5);
-  //ESP32Can.setTxQueueSize(5);
-
-  // .setSpeed() and .begin() functions require to use TwaiSpeed enum,
-  // but you can easily convert it from numerical value using .convertSpeed()
-  //ESP32Can.setSpeed(ESP32Can.convertSpeed(250));
-
-  // You can also just use .begin()..
-  // if (ESP32Can.begin()) {
-  //   Serial.println("CAN bus started!");
-  // } else {
-  //   Serial.println("CAN bus failed!");
-  // }
-  // 1. General Config: Set pins and NO_ACK mode for testing
   // TWAI_MODE_NO_ACK allows the message to send without an external node acknowledging it.
   twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT((gpio_num_t)CAN_TX, (gpio_num_t)CAN_RX, TWAI_MODE_NO_ACK);
 
@@ -65,10 +49,10 @@ void Caninit() {
 }
 
 void CanDecode() {
-  //check for an empty byte array
 
   CanCheckOldArray();
 
+  //check for an empty byte array
   uint8_t arrayNbr = 15;
   for (uint8_t j = 0; j < 8; j++) {
     if (CANreceiveBuffer[j][0] == 0) {
@@ -76,10 +60,10 @@ void CanDecode() {
       break;
     }
   }
-  if (arrayNbr < 8) {                                       //we have an empty array
-    if (twai_receive(&RCV, pdMS_TO_TICKS(10)) == ESP_OK) {  //received a sentence
+  if (arrayNbr < 8) {                                      //we have an empty array
+    if (twai_receive(&RCV, pdMS_TO_TICKS(0)) == ESP_OK) {  //received a sentence
       uint32_t id = RCV.identifier;
-      uint8_t idflag = (id >> 16) & 0x01;
+      uint8_t idflag = (id >> 16) & 0xFF;
       uint8_t idSrc = (id >> 8) & 0xFF;
       uint8_t idDest = id & 0xFF;
 
@@ -93,7 +77,16 @@ void CanDecode() {
         for (uint8_t i = 0; i < 8; i++) {
           CANreceiveBuffer[arrayNbr][i + 6] = RCV.data[i];
         }
-      } else {  //flag is 0, extended AOG PGN over multiple CAN sentences
+      } else if (idflag == 2) {
+        CANreceiveBuffer[arrayNbr][0] = 1;  //this mean there's a sentence to read, must be set to 0 once read
+        CANreceiveBuffer[arrayNbr][1] = 0;  //loop counter
+        CANreceiveBuffer[arrayNbr][2] = 0;  //sequence counter, not used for single sentences
+        CANreceiveBuffer[arrayNbr][3] = idSrc;
+        CANreceiveBuffer[arrayNbr][4] = idDest;
+        for (uint8_t i = 0; i < 8; i++) {
+          CANreceiveBuffer[arrayNbr][i + 5] = RCV.data[i];
+        }
+      } else if (idflag == 0) {  //flag is 0, extended AOG PGN over multiple CAN sentences
         //more that 8 bytes payload
         //buf[0] -> 4bytes message number and 4 bytes number of messages for all sentences
         //buf[1] is a sequence nbr
@@ -143,7 +136,7 @@ void CanCheckOldArray() {
     if (CANreceiveBuffer[k][0] > 0) {
       CANreceiveBuffer[k][1]++;
       if (CANreceiveBuffer[k][1] > 250) {
-/*
+        /*
         Serial.print("Sec= ");
         Serial.print(CANreceiveBuffer[k][0]);
         Serial.print(" , Source= ");
@@ -161,8 +154,10 @@ void EncodeAOGtoCAN() {
   //Input format: 0x80, 0x81, source, dest, lenght, data ........, CRC
   if (AOGtoCAN[2] > 0 && AOGtoCAN[3] > 0) {  //something to send
     uint8_t leng = min(AOGtoCAN[4], (uint8_t)245);
-    if (leng <= 8) {  //single sentence
+    if (leng == 8) {  //single sentence std 8 bytes
       CanEncode(1, AOGtoCAN[2], AOGtoCAN[3], AOGtoCAN[5], AOGtoCAN[6], AOGtoCAN[7], AOGtoCAN[8], AOGtoCAN[9], AOGtoCAN[10], AOGtoCAN[11], AOGtoCAN[12]);
+    } else if (leng < 8) {  //single sentence less than 8 bytes
+      CanEncode(2, AOGtoCAN[2], AOGtoCAN[3], AOGtoCAN[4], AOGtoCAN[5], AOGtoCAN[6], AOGtoCAN[7], AOGtoCAN[8], AOGtoCAN[9], AOGtoCAN[10], AOGtoCAN[11]);
     } else {  //multiple sentences
       AOGtoCANseq++;
       uint8_t NumberOfMessages = (leng + 1) / 6;
@@ -184,8 +179,8 @@ void EncodeAOGtoCAN() {
 void CanEncode(uint8_t flag, uint8_t src, uint8_t dest, uint8_t data0, uint8_t data1, uint8_t data2, uint8_t data3, uint8_t data4, uint8_t data5, uint8_t data6, uint8_t data7) {
 
   //uint32_t id = dest | src << 8 | 1 << 16;
-  twai_message_t SendCan8= {0};
-  uint32_t id = (dest & 0xFF) | ((src & 0xFF) << 8) | ((flag & 1) << 16);
+  twai_message_t SendCan8 = { 0 };
+  uint32_t id = (dest & 0xFF) | ((src & 0xFF) << 8) | ((flag & 0xFF) << 16);
   SendCan8.identifier = id;
   SendCan8.extd = 1;
   SendCan8.rtr = 0;
@@ -202,7 +197,7 @@ void CanEncode(uint8_t flag, uint8_t src, uint8_t dest, uint8_t data0, uint8_t d
 
   //ESP32Can.writeFrame(SendCan8, 1);
   // Queue message for transmission
-  if (twai_transmit(&SendCan8, pdMS_TO_TICKS(1000)) == ESP_OK) {
+  if (twai_transmit(&SendCan8, pdMS_TO_TICKS(1)) == ESP_OK) {
     //Serial.println("Message successfully queued for transmission");
   } else {
     Serial.println("Failed to queue message");

@@ -5,9 +5,10 @@
 // EncodeAOGtoCAN(): to send the AOGtoCAN[] array over canbus
 // Caninit();   add to main Setup  after doSetup()
 
-//id is 3 bytes: first (highest) is 1 for std 8 byte AOG sentence, 0 for multiple one, second (middle) byte is source, third (smallest) is destination
+//id is 3 bytes, 18bits, 19 to 26 are 0s: first (highest) is: 2 for payloads of less than 8 bytes, 1 for std 8 byte AOG sentence, 0 for multiple one, second (middle) byte is source, third (smallest) is destination
 
-//8 bytes sentences sent in one message, without CRC
+//8 bytes or less sentences sent in one message, without CRC
+//8 bytes sentence don't send length, 7 and less, the first byte is the payload lenght
 //longer sentences are sent in multiple messages, 6 bytes per message, including first byte as the message lenght and the last as CRC
 //byte0: nbr/total (4bits / 4bits)
 //byte1: sequence nbr (same for the whole sequence)
@@ -40,11 +41,11 @@ void CanDecode() {
   if (arrayNbr < 8) {         //we have an empty array
     if (CanMain.read(RCV)) {  //received a sentence
       uint32_t id = RCV.id;
-      uint8_t idflag = (id >> 16) & 0x01;
+      uint8_t idflag = (id >> 16) & 0xFF;  //check all 8 bits
       uint8_t idSrc = (id >> 8) & 0xFF;
       uint8_t idDest = id & 0xFF;
 
-/*
+      /*
         Serial.print(", src= ");
         Serial.print(idSrc);
         Serial.print(" , PGN= ");
@@ -62,7 +63,16 @@ void CanDecode() {
         for (uint8_t i = 0; i < 8; i++) {
           CANreceiveBuffer[arrayNbr][i + 6] = RCV.buf[i];
         }
-      } else {  //flag is 0, extended AOG PGN over multiple CAN sentences
+      } else if (idflag == 2) {
+        CANreceiveBuffer[arrayNbr][0] = 1;  //this mean there's a sentence to read, must be set to 0 once read
+        CANreceiveBuffer[arrayNbr][1] = 0;  //loop counter
+        CANreceiveBuffer[arrayNbr][2] = 0;  //sequence counter, not used for single sentences
+        CANreceiveBuffer[arrayNbr][3] = idSrc;
+        CANreceiveBuffer[arrayNbr][4] = idDest;
+        for (uint8_t i = 0; i < 8; i++) {
+          CANreceiveBuffer[arrayNbr][i + 5] = RCV.buf[i];
+        }
+      } else if (idflag == 0) {  //flag is 0, extended AOG PGN over multiple CAN sentences
         //more that 8 bytes payload
         //buf[0] -> 4bytes message number and 4 bytes number of messages for all sentences
         //buf[1] is a sequence nbr
@@ -75,11 +85,11 @@ void CanDecode() {
 
         if (messageNbr == 1) {  //new message
           //write the message
-          if (messageTotal == 1){
-          CANreceiveBuffer[arrayNbr][0] = 1; //ready to seed
-          }else{
-            CANreceiveBuffer[arrayNbr][0] = 2; //this mean we are writing a longer PGN
-          }            
+          if (messageTotal == 1) {
+            CANreceiveBuffer[arrayNbr][0] = 1;  //ready to seed
+          } else {
+            CANreceiveBuffer[arrayNbr][0] = 2;  //this mean we are writing a longer PGN
+          }
           CANreceiveBuffer[arrayNbr][1] = 0;            //loop counter
           CANreceiveBuffer[arrayNbr][2] = sequenceNbr;  //sequence nbr
           CANreceiveBuffer[arrayNbr][3] = idSrc;
@@ -123,8 +133,10 @@ void EncodeAOGtoCAN() {
   //Input format: 0x80, 0x81, source, dest, lenght, data ........, CRC
   if (AOGtoCAN[2] > 0 && AOGtoCAN[3] > 0) {  //something to send
     uint8_t leng = min(AOGtoCAN[4], 245);
-    if (leng <= 8) {  //single sentence
+    if (leng == 8) {  //single  8 byte sentence
       CanEncode(1, AOGtoCAN[2], AOGtoCAN[3], AOGtoCAN[5], AOGtoCAN[6], AOGtoCAN[7], AOGtoCAN[8], AOGtoCAN[9], AOGtoCAN[10], AOGtoCAN[11], AOGtoCAN[12]);
+    } else if (leng < 8) {  //single short sentence
+      CanEncode(2, AOGtoCAN[2], AOGtoCAN[3], AOGtoCAN[4], AOGtoCAN[5], AOGtoCAN[6], AOGtoCAN[7], AOGtoCAN[8], AOGtoCAN[9], AOGtoCAN[10], AOGtoCAN[11]);
     } else {  //multiple sentences
       AOGtoCANseq++;
       uint8_t NumberOfMessages = (leng + 1) / 6;
@@ -146,7 +158,7 @@ void EncodeAOGtoCAN() {
 void CanEncode(uint8_t flag, uint8_t src, uint8_t dest, uint8_t data0, uint8_t data1, uint8_t data2, uint8_t data3, uint8_t data4, uint8_t data5, uint8_t data6, uint8_t data7) {
 
   //uint32_t id = dest | src << 8 | 1 << 16;
-  uint32_t id = (dest & 0xFF) | ((src & 0xFF) << 8) | ((flag & 1) << 16);
+  uint32_t id = (dest & 0xFF) | ((src & 0xFF) << 8) | ((flag & 0xFF) << 16);
   SendCan8.buf[0] = data0;
   SendCan8.buf[1] = data1;
   SendCan8.buf[2] = data2;

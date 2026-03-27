@@ -1,6 +1,9 @@
 // ESP32_BRIDGE_EXAMPLE.cpp
 // Example ESP32 code for v26 Serial-to-WiFi Bridge
 // This demonstrates the basic structure needed to communicate with v26
+char arduinoDate[] = "2026-03-27";
+char firmwareName[] = "AiO_ESP32 CAN bridge";
+char arduinoVersion[] = "v 1.0.3";
 
 #include <Arduino.h>
 #include "driver/twai.h"  // Required for status functions
@@ -154,7 +157,10 @@ void setup() {
   Caninit();
   // Small delay for serial to initialize
   delay(100);
-
+  delay(100);
+  Serial.println(firmwareName);
+  Serial.println(arduinoVersion);
+  Serial.println(arduinoDate);
   // Send initial hello
   Serial1.print("ESP32-hello");
   lastHelloTime = millis();
@@ -223,15 +229,11 @@ void CheckDataFromCAN() {
 void checkCANStatus() {
   twai_status_info_t status;
   if (twai_get_status_info(&status) == ESP_OK) {
-    Serial.print("CAN State: ");
     switch (status.state) {
-      case TWAI_STATE_STOPPED: Serial.println("STOPPED"); break;
-      case TWAI_STATE_RUNNING: Serial.println("RUNNING"); break;
-      case TWAI_STATE_BUS_OFF: Serial.println("BUS-OFF (Hardware Error)"); break;
-      case TWAI_STATE_RECOVERING: Serial.println("RECOVERING"); break;
+      case TWAI_STATE_STOPPED: Serial.println("CAN State: STOPPED"); break;
+      case TWAI_STATE_BUS_OFF: Serial.println("CAN State: BUS-OFF (Hardware Error)"); break;
+      case TWAI_STATE_RECOVERING: Serial.println("CAN State: RECOVERING"); break;
     }
-    // Check error counters
-    Serial.printf("TX Errors: %d | RX Errors: %d\n", status.tx_error_counter, status.rx_error_counter);
 
     // If Bus-Off, try to recover
     if (status.state == TWAI_STATE_BUS_OFF) {

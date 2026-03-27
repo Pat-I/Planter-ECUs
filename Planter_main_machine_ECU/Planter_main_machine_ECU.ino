@@ -1,8 +1,8 @@
 
 
-char arduinoDate[] = "2026-03-21";
+char arduinoDate[] = "2026-03-27";
 char firmwareName[] = "JD1770NT main machine ECU";
-char arduinoVersion[] = "v 1.0.2";
+char arduinoVersion[] = "v 1.0.3";
 
 /*  PWM Frequency -> 
    *   490hz (default) = 0
@@ -174,38 +174,38 @@ void CheckDataFromCAN() {
       //{ code, loopCounter, sequence, Source, Dest, lenght, Data......., CRC (only if data > 8)}
       switch (CANreceiveBuffer[i][3]) {
         case 123:  //planter monitor, just forward
+          {
+            uint8_t len = CANreceiveBuffer[i][5];  // message lenght
 
-          if (CANreceiveBuffer[i][5] == 8) {  //standard 8 bytes message
-
-            for (uint8_t e = 2; e < 13; e++) {
+            for (uint8_t e = 2; e < (len + 5); e++) {
               popSerial_data[e] = CANreceiveBuffer[i][e + 1];
             }
             CK_A = 0;
 
-            for (int16_t i = 2; i < popSerial_dataSize - 1; i++) {
-              CK_A = (CK_A + popSerial_data[i]);
+            for (int16_t j = 2; j < (len + 5); j++) {
+              CK_A = (CK_A + popSerial_data[j]);
             }
 
-            popSerial_data[popSerial_dataSize - 1] = CK_A;
-            SerialPop.write(popSerial_data, popSerial_dataSize);
+            popSerial_data[len + 5] = CK_A;
+            SerialPop.write(popSerial_data, (len + 6));
 
             for (int k = 5; k < 13; k++) {
               popSerial_data[k] = 0;
             }
+
+            break;
           }
-
-          break;
-
         case 127:  //7F, from AOG
           //forward 239 to pop serial.
           if (CANreceiveBuffer[i][4] == 239) {
+
             for (uint8_t e = 2; e < 13; e++) {
               popSerial_data[e] = CANreceiveBuffer[i][e + 1];
             }
             CK_A = 0;
 
-            for (int16_t i = 2; i < popSerial_dataSize - 1; i++) {
-              CK_A = (CK_A + popSerial_data[i]);
+            for (int16_t j = 2; j < popSerial_dataSize - 1; j++) {
+              CK_A = (CK_A + popSerial_data[j]);
             }
 
             popSerial_data[popSerial_dataSize - 1] = CK_A;
