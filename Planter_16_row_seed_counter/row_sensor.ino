@@ -9,11 +9,11 @@ void RetrieveRowData() {
       sensorSeedTimeStable[i] = sensorSeedTime[i];
       interrupts();
 
-      #ifdef SERIAL_POP_COUNTER
+#ifdef SERIAL_POP_COUNTER
       SeedCountTotal[i]++;
       Serial.print("seed on row ");
       Serial.println((i + 1));
-      #endif
+#endif
 
       sensorSeedDuration = sensorSeedTimeStable[i] - lastSensorTime[i];
       lastSensorTime[i] = sensorSeedTimeStable[i];
@@ -32,6 +32,7 @@ void RetrieveRowData() {
 
         if (isRowRecoring[i] && ReceivedFirstSeed[i]) {
           //we do not count the first gap after the seeder has been lowered
+          rc_seedCount[i]++;
           // the spacing will overflow over 25.5km/h because of AOGSpeedX10
           actualPlantSpacing = (sensorSeedDuration * (uint32_t)AOGSpeedX10) / 36;
 
@@ -45,9 +46,11 @@ void RetrieveRowData() {
 
           if (actualPlantSpacing > seedGapSkip) {
             sk_skips[i]++;
+            rc_skips[i]++;
           }
           if (actualPlantSpacing < seedGapDouble) {
             dbl_doubles[i]++;
+            rc_doubles[i]++;
           }
         } else {
           ReceivedFirstSeed[i] = true;

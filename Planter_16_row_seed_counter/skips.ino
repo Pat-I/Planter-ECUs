@@ -1,6 +1,6 @@
 void skipdetail() {
 
-  sk_byteIndex = 5;
+  uint8_t sk_byteIndex = 5;
 
   for (int i = 0; i < numPlanterRows; i++) {
     if (sk_skips[i] > 0) {

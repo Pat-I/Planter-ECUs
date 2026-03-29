@@ -1,7 +1,7 @@
 
 
-char arduinoDate[] = "2026-03-27";
-char arduinoVersion[] = "v 1.0.4";
+char arduinoDate[] = "2026-03-28";
+char arduinoVersion[] = "v 1.0.5";
 
 //#define SERIAL_POP_COUNTER  //show the number of seed passed per row in the serial monitor,
 
@@ -77,7 +77,7 @@ int16_t space_dataSize = sizeof(space_data);
 uint8_t space2_data[] = { 0x80, 0x81, 0x7b, 0xCA, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
 int16_t space2_dataSize = sizeof(space2_data);
 
-uint8_t rc_data[] = { 0x80, 0x81, 0x7b, 0xE6, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
+uint8_t rc_data[] = { 0x80, 0x81, 0x7b, 0xE6, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 }; // status details
 int16_t rc_dataSize = sizeof(rc_data);
 
 uint8_t rc_summary[] = { 0x80, 0x81, 0x7b, 0xE5, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
@@ -100,15 +100,15 @@ int16_t pop2_dataSize = sizeof(pop2_data);
 uint8_t feedback[] = { 0x80, 0x81, 0x7b, 0xE0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
 int16_t feedbackSize = sizeof(feedback);
 
-uint8_t rowStatus[] = { 0x80, 0x81, 0x7b, 0xF0, 4, 1, 0, 0, 0, 15 };// for 16 row only
+uint8_t rowStatus[] = { 0x80, 0x81, 0x7b, 0xF0, 4, 1, 0, 0, 0, 15 };  // for 16 row only
 int16_t rowStatusSize = sizeof(rowStatus);
 
 //Parsing PGN
 bool isHeaderFound = false;
 int16_t tempHeader = 0;
 bool isLengthFound = false;
-int header = 0;
-int temp = 0;
+uint16_t header = 0;
+uint16_t temp = 0;
 uint8_t serialSource = 0;
 uint8_t serialPgn = 0;
 uint8_t serialLength = 0;
@@ -121,38 +121,38 @@ uint8_t PinIN[] = { 34, 33, 36, 35, 38, 37, 40, 39, 14, 41, 16, 15, 18, 17, 20, 
 
 //Sensor logic
 uint32_t seedDebounceTime = 2;                                                            //Debounce time in ms after seed detection, 3ms is about the time a seed passes by?
-volatile bool sensorNewData[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };       //A seed has been read
-uint32_t lastSensorTime[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };           //previous time
-volatile uint32_t sensorSeedTime[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };  //Actual time of seed detection
+volatile bool sensorNewData[16];       //A seed has been read
+uint32_t lastSensorTime[16];           //previous time
+volatile uint32_t sensorSeedTime[16];  //Actual time of seed detection
 
-uint32_t sensorSeedTimeStable[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };  //Actual time of seed detection but not volatile
+uint32_t sensorSeedTimeStable[16];  //Actual time of seed detection but not volatile
 
 //storage variables
 uint16_t rowWidth = 762;  // in mm
-int numPlanterRows = 16;
+uint8_t numPlanterRows = 16;
 uint16_t doublesFactor = 29;
 uint32_t targetPopulation = 84000;  //per Ha
 //float targetSpeed = 4.9f;
 //float AOGSpeed = 0.0f;
 uint16_t AOGSpeedX10 = 0;
-int isMetric = 1;
+uint8_t isMetric = 1;
 uint32_t seedGap = 0;
 uint32_t seedGapSkip = 0;
 uint32_t seedGapDouble = 0;
 //uint16_t doublePlantSpacing = 0;
 uint32_t actualPlantSpacing = 0;
 
-uint32_t sensorSeedDuration;                                                           //time betwen 2 seeds
-uint32_t SeedPreviousDuration[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };  //time betwen 2 seeds
+uint32_t sensorSeedDuration;  //time betwen 2 seeds
+uint32_t SeedPreviousDuration[16];  //time betwen 2 seeds
 uint16_t sensorAllGaps[16][100];
-uint8_t sensorAllGapsIndex[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+uint8_t sensorAllGapsIndex[16];
 uint8_t sensorAllSk[100];
 uint8_t sensorAllDbl[100];
-bool isRowSeeding[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };   //this is when at least 2 seeds dropped the last 500ms, to send back the section status
-bool isRowRecoring[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };  //this is went AOG command on and the planter is lowered.
-bool ReceivedFirstSeed[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+bool isRowSeeding[16];   //this is when at least 2 seeds dropped the last 500ms, to send back the section status
+bool isRowRecoring[16];  //this is went AOG command on and the planter is lowered.
+bool ReceivedFirstSeed[16];
 bool isPlanterLowered = true;
-uint8_t sectionStatus[] = { 0, 0 };
+uint8_t sectionStatus[2];
 
 uint8_t millisSectionStatus = 0;
 //Summary
@@ -160,15 +160,15 @@ uint8_t millisSectionStatus = 0;
 uint16_t SeedCountTotal[16];
 #endif
 uint8_t millisAtSCount = 0;
-uint8_t SeedCount[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-uint8_t Skips[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-uint8_t Doubles[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-uint32_t avgSpacing[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-uint8_t singulation[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+uint8_t SeedCount[16];
+uint8_t Skips[16];
+uint8_t Doubles[16];
+uint32_t avgSpacing[16];
+uint8_t singulation[16];
 #ifdef SEND_POP_PGN
-uint16_t popDVD100[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+uint16_t popDVD100[16];
 #endif
-uint32_t population[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+uint32_t population[16];
 uint32_t sum_skipPercentX10 = 0;
 uint32_t sum_doublesPercentX10 = 0;
 uint32_t sum_singulationX10 = 0;
@@ -176,11 +176,18 @@ uint32_t sum_populationD10 = 0;
 uint8_t byteIndex = 5;
 //skip double detail data
 uint8_t millisForArray = 5;
-int sk_skips[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-int dbl_doubles[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+uint8_t sk_skips[16];
+uint8_t dbl_doubles[16];
 uint8_t millisAtDblCount = 0;
-int sk_byteIndex = 12;
-int dbl_byteIndex = 12;
+//statusdetail
+uint8_t rc_seedCount[16];
+uint8_t rc_skips[16];
+uint8_t rc_doubles[16];
+uint8_t normal_color = 0;
+uint8_t red_color = 1;
+uint8_t yellow_color = 2;
+uint8_t purple_color = 3;
+uint8_t feedbackCounter = 0;
 
 void setup() {
   // Core at 150 MHz (To reduce heat)
@@ -317,6 +324,7 @@ void loop() {
 #endif
 
   if (currentTime - lastTime >= LOOP_TIME) {
+    //100 ms loop
     lastTime = currentTime;
 
     millisSectionStatus++;
@@ -356,6 +364,7 @@ void loop() {
     }
 
     if (millisAtSCount >= 10) {
+      statusDetail();
       Summary();
       millisAtSCount = 0;
     }

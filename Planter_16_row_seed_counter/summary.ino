@@ -51,7 +51,7 @@ void Summary() {
     CK_A = (CK_A + pop_data[i]);
   }
   pop_data[pop_dataSize - 1] = CK_A;
-  Serial1.write(pop_data, pop_dataSize);
+  SerialPop.write(pop_data, pop_dataSize);
 
   CK_A = 0;
 
@@ -60,7 +60,7 @@ void Summary() {
   }
 
   pop2_data[pop2_dataSize - 1] = CK_A;
-  Serial1.write(pop2_data, pop2_dataSize);
+  SerialPop.write(pop2_data, pop2_dataSize);
 
   for (int k = 5; k < 13; k++) {
     pop_data[k] = datazero;

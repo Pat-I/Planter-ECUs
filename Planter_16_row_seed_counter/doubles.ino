@@ -1,6 +1,6 @@
 void doubledetail() {
 
-  dbl_byteIndex = 5;
+  uint8_t dbl_byteIndex = 5;
 
   for (int j = 0; j < numPlanterRows; j++) {
     if (dbl_doubles[j] > 0) {
