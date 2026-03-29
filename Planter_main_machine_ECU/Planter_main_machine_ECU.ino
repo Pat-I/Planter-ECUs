@@ -1,8 +1,8 @@
 
 
-char arduinoDate[] = "2026-03-27";
+char arduinoDate[] = "2026-03-28";
 char firmwareName[] = "JD1770NT main machine ECU";
-char arduinoVersion[] = "v 1.0.3";
+char arduinoVersion[] = "v 1.0.4";
 
 /*  PWM Frequency -> 
    *   490hz (default) = 0
@@ -26,9 +26,6 @@ uint8_t AOGtoCANseq = 0;
 uint8_t popRxBuffer[2048];
 uint8_t popTxBuffer[2048];
 uint32_t bautPop = 460800;
-uint8_t popSerial_data[] = { 0x80, 0x81, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
-int16_t popSerial_dataSize = sizeof(popSerial_data);
-uint8_t CK_A = 0;
 //Parsing PGN
 bool isHeaderFound = false;
 int16_t tempHeader = 0;
@@ -170,54 +167,39 @@ void CheckDataFromCAN() {
   for (uint8_t i = 0; i < 8; i++) {
     if (CANreceiveBuffer[i][0] == 1) {
       CANreceiveBuffer[i][0] = 0;  //read and ready to be re-used
+
       //format:
-      //{ code, loopCounter, sequence, Source, Dest, lenght, Data......., CRC (only if data > 8)}
-      switch (CANreceiveBuffer[i][3]) {
-        case 123:  //planter monitor, just forward
-          {
-            uint8_t len = CANreceiveBuffer[i][5];  // message lenght
+      // code, loopCounter, sequence, Source, Dest, lenght, Data......., CRC (only if data > 8)
+      uint8_t buffer[256];
+      uint8_t dataSrc = CANreceiveBuffer[i][3];
+      uint8_t dataPGN = CANreceiveBuffer[i][4];
+      uint8_t dataLen = CANreceiveBuffer[i][5];
+      buffer[0] = 0x80;
+      buffer[1] = 0x81;
+      buffer[2] = dataSrc;
+      buffer[3] = dataPGN;
+      buffer[4] = dataLen;
 
-            for (uint8_t e = 2; e < (len + 5); e++) {
-              popSerial_data[e] = CANreceiveBuffer[i][e + 1];
-            }
-            CK_A = 0;
-
-            for (int16_t j = 2; j < (len + 5); j++) {
-              CK_A = (CK_A + popSerial_data[j]);
-            }
-
-            popSerial_data[len + 5] = CK_A;
-            SerialPop.write(popSerial_data, (len + 6));
-
-            for (int k = 5; k < 13; k++) {
-              popSerial_data[k] = 0;
-            }
-
-            break;
-          }
-        case 127:  //7F, from AOG
-          //forward 239 to pop serial.
-          if (CANreceiveBuffer[i][4] == 239) {
-
-            for (uint8_t e = 2; e < 13; e++) {
-              popSerial_data[e] = CANreceiveBuffer[i][e + 1];
-            }
-            CK_A = 0;
-
-            for (int16_t j = 2; j < popSerial_dataSize - 1; j++) {
-              CK_A = (CK_A + popSerial_data[j]);
-            }
-
-            popSerial_data[popSerial_dataSize - 1] = CK_A;
-            SerialPop.write(popSerial_data, popSerial_dataSize);
-
-            for (int k = 5; k < 13; k++) {
-              popSerial_data[k] = 0;
-            }
-          }
-
-          break;
+      if (dataLen > 0) {
+        //memcpy(&buffer[5], data, dataLen);
+        for (uint8_t j = 0; j < dataLen; j++) {
+          buffer[j + 5] = CANreceiveBuffer[i][j + 6];
+        }
       }
+
+      uint8_t crc = calculateCRC(buffer, 5 + dataLen);
+      buffer[5 + dataLen] = crc;
+
+      if (dataSrc == 123 || (dataSrc == 127 && dataPGN == 239)) SerialPop.write(buffer, 6 + dataLen);
     }
   }
+}
+
+// Calculate CRC for PGN message
+uint8_t calculateCRC(uint8_t* buffer, uint8_t length) {
+  uint8_t crc = 0;
+  for (int i = 2; i < length; i++) {
+    crc += buffer[i];
+  }
+  return crc;
 }
