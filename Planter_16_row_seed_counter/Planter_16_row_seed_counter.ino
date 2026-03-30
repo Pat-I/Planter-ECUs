@@ -1,7 +1,7 @@
 
 
-char arduinoDate[] = "2026-03-28";
-char arduinoVersion[] = "v 1.0.5";
+char arduinoDate[] = "2026-03-29";
+char arduinoVersion[] = "v 1.0.6";
 
 //#define SERIAL_POP_COUNTER  //show the number of seed passed per row in the serial monitor,
 
@@ -62,7 +62,6 @@ uint32_t timer_mesure = 0;  // Chronomètre
 extern "C" uint32_t set_arm_clock(uint32_t frequency);
 extern float tempmonGetTemp(void);
 
-const uint8_t datazero = 0;
 uint8_t CK_A = 0;
 
 uint8_t sin_data[] = { 0x80, 0x81, 0x7b, 0xCD, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
@@ -77,17 +76,15 @@ int16_t space_dataSize = sizeof(space_data);
 uint8_t space2_data[] = { 0x80, 0x81, 0x7b, 0xCA, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
 int16_t space2_dataSize = sizeof(space2_data);
 
-uint8_t rc_data[] = { 0x80, 0x81, 0x7b, 0xE6, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 }; // status details
+uint8_t rc_data[] = { 0x80, 0x81, 0x7b, 0xE6, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };  // status details
 int16_t rc_dataSize = sizeof(rc_data);
 
 uint8_t rc_summary[] = { 0x80, 0x81, 0x7b, 0xE5, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
 int16_t rc_summarySize = sizeof(rc_summary);
 
 uint8_t sk_data[] = { 0x80, 0x81, 0x7b, 0xE4, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
-int16_t sk_dataSize = sizeof(sk_data);
 
 uint8_t dbl_data[] = { 0x80, 0x81, 0x7b, 0xE3, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
-int16_t dbl_dataSize = sizeof(dbl_data);
 
 #ifdef SEND_POP_PGN
 uint8_t pop_data[] = { 0x80, 0x81, 0x7b, 0xE2, 8, 0, 0, 0, 0, 0, 0, 0, 0, 15 };
@@ -120,7 +117,7 @@ uint8_t serialCRC = 0;
 uint8_t PinIN[] = { 34, 33, 36, 35, 38, 37, 40, 39, 14, 41, 16, 15, 18, 17, 20, 19 };
 
 //Sensor logic
-uint32_t seedDebounceTime = 2;                                                            //Debounce time in ms after seed detection, 3ms is about the time a seed passes by?
+uint32_t seedDebounceTime = 2;         //Debounce time in ms after seed detection, 3ms is about the time a seed passes by?
 volatile bool sensorNewData[16];       //A seed has been read
 uint32_t lastSensorTime[16];           //previous time
 volatile uint32_t sensorSeedTime[16];  //Actual time of seed detection
@@ -132,17 +129,14 @@ uint16_t rowWidth = 762;  // in mm
 uint8_t numPlanterRows = 16;
 uint16_t doublesFactor = 29;
 uint32_t targetPopulation = 84000;  //per Ha
-//float targetSpeed = 4.9f;
-//float AOGSpeed = 0.0f;
 uint16_t AOGSpeedX10 = 0;
 uint8_t isMetric = 1;
 uint32_t seedGap = 0;
 uint32_t seedGapSkip = 0;
 uint32_t seedGapDouble = 0;
-//uint16_t doublePlantSpacing = 0;
 uint32_t actualPlantSpacing = 0;
 
-uint32_t sensorSeedDuration;  //time betwen 2 seeds
+uint32_t sensorSeedDuration;        //time betwen 2 seeds
 uint32_t SeedPreviousDuration[16];  //time betwen 2 seeds
 uint16_t sensorAllGaps[16][100];
 uint8_t sensorAllGapsIndex[16];
@@ -347,19 +341,20 @@ void loop() {
     // check if a field is connected
     if (millisSectionStatus > 3) {
       millisSectionStatus = 0;  // wait 0.4 sec to do it again if still no connection
+
+      memset(isRowRecoring, 0, numPlanterRows);
+      memset(ReceivedFirstSeed, 0, numPlanterRows);
+      memset(sensorAllGapsIndex, 0, numPlanterRows);
       for (uint8_t i = 0; i < numPlanterRows; i++) {
-        isRowRecoring[i] = false;
-        ReceivedFirstSeed[i] = false;
-        sensorAllGapsIndex[i] = 0;  //reset the array
         sensorAllGaps[i][0] = 0;
-        sectionStatus[0] = 0;
-        sectionStatus[1] = 0;
       }
+      sectionStatus[0] = 0;
+      sectionStatus[1] = 0;
     }
 
     if (millisAtDblCount >= millisForArray) {
-      doubledetail();
-      skipdetail();
+      sendDetail(dbl_doubles, dbl_data);
+      sendDetail(sk_skips, sk_data);
       millisAtDblCount = 0;
     }
 
@@ -506,7 +501,7 @@ void SendRowStatus() {
   //int16_t rowStatusSize = sizeof(rowStatus);
   rowStatus[6] = numPlanterRows;
   for (uint8_t i = 0; i < numPlanterRows; i++) {
-    rowStatus[7 + i / 8] |= isRowSeeding[i] << (i - (i / 8) * 8);  //i - (i / 8) * 8
+    rowStatus[7 + (i >> 3)] |= (isRowSeeding[i] << (i & 0x07));
   }
   CK_A = 0;
 

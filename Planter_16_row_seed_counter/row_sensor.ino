@@ -45,10 +45,12 @@ void RetrieveRowData() {
 
 
           if (actualPlantSpacing > seedGapSkip) {
+            sensorAllSk[putArrayIndex] = 1;
             sk_skips[i]++;
             rc_skips[i]++;
           }
           if (actualPlantSpacing < seedGapDouble) {
+            sensorAllDbl[putArrayIndex] = 1;
             dbl_doubles[i]++;
             rc_doubles[i]++;
           }

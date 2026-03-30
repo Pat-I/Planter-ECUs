@@ -1,107 +1,38 @@
 void statusDetail() {
-  int numToTest = 4;
-  if (numPlanterRows < 4) numToTest = numPlanterRows;
-  for (int i = numToTest - 1; i >= 0; i--) {
 
-    if (isRowRecoring[i] && rc_seedCount[i] < 1) {
-      rc_data[5] += red_color;
-      //            Serial.println("red 01");
-    } else if (rc_skips[i] > 0) {
-      rc_data[5] += yellow_color;
-      //              Serial.print(i);
-      //              Serial.print("  ");
-      //                    Serial.println("yellow");
-    } else if (rc_doubles[i] > 0) {
-      rc_data[5] += purple_color;
-      //              Serial.print(i);
-      //              Serial.println(" purple");
-    } else {
-      rc_data[5] += normal_color;
-      //            Serial.println("normal 00");
-    }
-    if (i > 0) rc_data[5] = rc_data[5] << 2;
-  }
+  for (int row = 0; row < numPlanterRows; row++) {
+    unsigned int color = normal_color;  // Par défaut
+    if (rc_seedCount[row] < 1) color = red_color;
+    else if (rc_skips[row] > 0) color = yellow_color;
+    else if (rc_doubles[row] > 0) color = purple_color;
 
-  numToTest = 8;
-  if (numPlanterRows < 8) numToTest = numPlanterRows;
-  for (int i = numToTest - 1; i >= 4; i--) {
-    if (isRowRecoring[i] && rc_seedCount[i] < 1) {
-      rc_data[6] += red_color;
-      //      Serial.println("red 01");
-      if (i > 4) rc_data[6] = rc_data[6] << 2;
-    } else if (rc_skips[i] > 0) {
-      rc_data[6] += yellow_color;
-      //      Serial.println("yellow 10");
-      if (i > 4) rc_data[6] = rc_data[6] << 2;
-    } else if (rc_doubles[i] > 0) {
-      rc_data[6] += purple_color;
-      //              Serial.print(i);
-      //              Serial.println(" purple");
-      if (i > 4) rc_data[6] = rc_data[6] << 2;
-    } else {
-      rc_data[6] += normal_color;
-      //      Serial.println("normal 00");
-      if (i > 4) rc_data[6] = rc_data[6] << 2;
-    }
-  }
-  numToTest = 12;
-  if (numPlanterRows < 12) numToTest = numPlanterRows;
-  for (int i = numToTest - 1; i >= 8; i--) {
-    if (isRowRecoring[i] && rc_seedCount[i] < 1) {
-      rc_data[7] += red_color;
-      //      Serial.println("red 01");
-      if (i > 8) rc_data[7] = rc_data[7] << 2;
-    } else if (rc_skips[i] > 0) {
-      rc_data[7] += yellow_color;
-      //Serial.println("yellow 10");
-      if (i > 8) rc_data[7] = rc_data[7] << 2;
-    } else if (rc_doubles[i] > 0) {
-      rc_data[7] += purple_color;
-      //      Serial.println("purple 11");
-      if (i > 8) rc_data[7] = rc_data[7] << 2;
-    } else {
-      rc_data[7] += normal_color;
-      //    Serial.println("normal 00");
-      if (i > 8) rc_data[7] = rc_data[7] << 2;
-    }
-  }
-  numToTest = 16;
-  if (numPlanterRows < 16) numToTest = numPlanterRows;
-  for (int i = numToTest - 1; i >= 12; i--) {
-    //            Serial.print(i);
-    if (isRowRecoring[i] && rc_seedCount[i] < 1) {
-      rc_data[8] += red_color;
-      //              Serial.println("red 01");
-      if (i > 12) rc_data[8] = rc_data[8] << 2;
-    } else if (rc_skips[i] > 0) {
-      rc_data[8] += yellow_color;
-      //                      Serial.println(" yellow 10");
-      if (i > 12) rc_data[8] = rc_data[8] << 2;
-    } else if (rc_doubles[i] > 0) {
-      rc_data[8] += purple_color;
-      //                      Serial.println(" purple 11");
-      if (i > 12) rc_data[8] = rc_data[8] << 2;
-    } else {
-      rc_data[8] += normal_color;
-      //            Serial.println("normal 00");
-      if (i > 12) rc_data[8] = rc_data[8] << 2;
+    int dataIndex = 5 + (row / 4);
+    int shift = (3 - (row % 4)) * 2;
+
+    if (dataIndex <= 8) {
+      rc_data[dataIndex] |= (color << shift);
     }
   }
 
   rc_data[9] = feedbackCounter++;  // used in AgOpenGPS to tell communications are working
 
-  int16_t CK_A = 0;
-
-  for (int16_t i = 2; i < rc_dataSize - 1; i++) {
-    CK_A = (CK_A + rc_data[i]);
+  //add 10 and 11 send sections as active(1) or inactive(0)
+  for (uint8_t i = 0; i < numPlanterRows; i++) {
+    rc_data[10 + (i >> 3)] |= (isRowRecoring[i] << (i & 0x07));
   }
 
-  rc_data[rc_dataSize - 1] = CK_A;
+  uint8_t ck_a = 0;
+
+  for (int16_t i = 2; i < rc_dataSize - 1; i++) {
+    ck_a += rc_data[i];
+  }
+
+  rc_data[rc_dataSize - 1] = ck_a;
 
 
-  Serial1.write(rc_data, rc_dataSize);
+  SerialPop.write(rc_data, rc_dataSize);
   //    Serial.flush();
-  Serial.println(rc_data[5]);
+  //Serial.println(rc_data[5]);
 
   for (int j = 0; j <= numPlanterRows; j++) {
     rc_seedCount[j] = 0;
@@ -109,9 +40,6 @@ void statusDetail() {
     rc_doubles[j] = 0;
   }
 
-  rc_data[5] = datazero;
-  rc_data[6] = datazero;
-  rc_data[7] = datazero;
-  rc_data[8] = datazero;
+  memset(&rc_data[5], 0, 8);
 
 }  // void
