@@ -111,6 +111,7 @@ uint8_t serialPgn = 0;
 uint8_t serialLength = 0;
 uint8_t serialData[64];  //just to be sure it's long enough
 uint8_t serialCRC = 0;
+uint8_t sendConfigBack = 5;  //first is sent after 5 sec
 
 //Pins
 //Sensor Pins
@@ -329,10 +330,11 @@ void loop() {
     for (uint8_t i = 0; i < numPlanterRows; i++) {
       if (isRowSeeding[i]) {
         if (currentTime - sensorSeedTimeStable[i] > 200) {
-          // over half a second witout seed so turn section off
+          // over .2 second witout seed so turn section off
           isRowSeeding[i] = false;
           //just reset the index
-          //sensorAllTimesIndex[i] = 0;// not here, here we send the section off to AOG
+          sensorAllGapsIndex[i] = 0;  //here, to send 0 as pop for this row
+          ReceivedFirstSeed[i] = false;
         }
       }
     }
@@ -362,6 +364,10 @@ void loop() {
       statusDetail();
       Summary();
       millisAtSCount = 0;
+      if (sendConfigBack++ > 10) {
+        sendConfigBack = 0;
+        SendSettingdBack();
+      }
     }
   }  // end of 100 ms loop
 
@@ -440,6 +446,7 @@ void loop() {
         seedGapDouble = seedGap * doublesFactor;
         seedGapDouble /= 100;
         //doublePlantSpacing = seedGap * 2;
+        SendSettingdBack();
       }
 
       if (serialPgn == 233)  //E9 PlanterConfigData
@@ -485,14 +492,16 @@ void CheckRowStatus() {
       uint8_t byteNbr = i / 8;
 
       isRowRecoring[i] = bitRead(sectionStatus[byteNbr], i - byteNbr * 8);
-      if (!isRowRecoring[i]) ReceivedFirstSeed[i] = false;
+      //if (!isRowRecoring[i]) {
+      //ReceivedFirstSeed[i] = false;
+      //sensorAllGapsIndex[i] = 0;
+      //}
     }
   } else {
     //raised, stop recording
-    for (uint8_t i = 0; i < numPlanterRows; i++) {
-      isRowRecoring[i] = false;
-      ReceivedFirstSeed[i] = false;
-    }
+    memset(isRowRecoring, 0, numPlanterRows);
+    //memset(ReceivedFirstSeed, 0, numPlanterRows);
+    //memset(sensorAllGapsIndex, 0, numPlanterRows);
   }
 }
 
@@ -513,6 +522,27 @@ void SendRowStatus() {
 
   SerialPop.write(rowStatus, rowStatusSize);
   memset(&rowStatus[6], 0, 3);
+}
+
+void SendSettingdBack() {
+  feedback[5] = (byte)(planterSettings.rxNumPlanterRows);
+  feedback[6] = (byte)planterSettings.rxTargetSpeedX10;
+  feedback[7] = (byte)(planterSettings.rxRowWidthX10Hi);
+  feedback[8] = (byte)(planterSettings.rxRowWidthX10Lo);
+  feedback[9] = (byte)(planterSettings.rxTargetPopulationHi);
+  feedback[10] = (byte)(planterSettings.rxTargetPopulationLo);
+  feedback[11] = (byte)(planterSettings.rxDoublesFactor);
+  feedback[12] = (byte)(planterSettings.rxIsMetric);
+
+  int8_t ck_a = 0;
+
+  for (int16_t i = 2; i < feedbackSize - 1; i++) {
+    ck_a += feedback[i];
+  }
+
+  feedback[feedbackSize - 1] = ck_a;
+
+  SerialPop.write(feedback, feedbackSize);
 }
 
 void ISR0() {

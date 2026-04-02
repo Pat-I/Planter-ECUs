@@ -18,7 +18,7 @@ void statusDetail() {
 
   //add 10 and 11 send sections as active(1) or inactive(0)
   for (uint8_t i = 0; i < numPlanterRows; i++) {
-    rc_data[10 + (i >> 3)] |= (isRowRecoring[i] << (i & 0x07));
+    rc_data[10 + (i >> 3)] |= (!isRowRecoring[i] << (i & 0x07));
   }
 
   uint8_t ck_a = 0;

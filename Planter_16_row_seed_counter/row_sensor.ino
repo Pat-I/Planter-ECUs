@@ -30,7 +30,7 @@ void RetrieveRowData() {
           }
         }
 
-        if (isRowRecoring[i] && ReceivedFirstSeed[i]) {
+        if (isRowSeeding[i] && ReceivedFirstSeed[i]) {
           //we do not count the first gap after the seeder has been lowered
           rc_seedCount[i]++;
           // the spacing will overflow over 25.5km/h because of AOGSpeedX10
