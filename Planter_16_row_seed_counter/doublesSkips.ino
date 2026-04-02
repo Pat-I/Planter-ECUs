@@ -5,7 +5,7 @@ void sendDetail(uint8_t* sourceArray, uint8_t* dataBuffer) {
     val <<= 4;
 
     if (i + 1 < numPlanterRows) {
-      val |= (sourceArray[i+1] > 7) ? 7 : sourceArray[i+1];
+      val |= (sourceArray[i + 1] > 7) ? 7 : sourceArray[i + 1];
     }
     dataBuffer[5 + (i >> 1)] = val;
   }
@@ -21,5 +21,5 @@ void sendDetail(uint8_t* sourceArray, uint8_t* dataBuffer) {
   // 4. Envoi via Serial
   SerialPop.write(dataBuffer, 14);
 
-  memset(&dataBuffer[5], 0, 8); 
+  memset(&dataBuffer[5], 0, 8);
 }

@@ -1,9 +1,9 @@
 // ESP32_BRIDGE_EXAMPLE.cpp
 // Example ESP32 code for v26 Serial-to-WiFi Bridge
 // This demonstrates the basic structure needed to communicate with v26
-char arduinoDate[] = "2026-03-27";
+char arduinoDate[] = "2026-03-31";
 char firmwareName[] = "AiO_ESP32 CAN bridge";
-char arduinoVersion[] = "v 1.0.3";
+char arduinoVersion[] = "v 1.0.4";
 
 #include <Arduino.h>
 #include "driver/twai.h"  // Required for status functions
@@ -123,9 +123,8 @@ void handlePGN(uint8_t source, uint8_t pgn, uint8_t* data, uint8_t length) {
   AOGtoCAN[2] = source;
   AOGtoCAN[3] = pgn;
   AOGtoCAN[4] = length;
-  for (uint8_t i = 0; i <= length; i++) {  //include the CRC
-    AOGtoCAN[i + 5] = data[i];
-  }
+
+  memcpy(&AOGtoCAN[5], data, length + 1);
 
   EncodeAOGtoCAN();
 }
@@ -212,11 +211,9 @@ void CheckDataFromCAN() {
       buffer[4] = dataLen;
 
       if (dataLen > 0) {
-        //memcpy(&buffer[5], data, dataLen);
-        for (uint8_t j = 0; j < dataLen; j++) {
-          buffer[j + 5] = CANreceiveBuffer[i][j + 6];
-        }
+        memcpy(&buffer[5], &CANreceiveBuffer[i][6], dataLen);
       }
+
 
       uint8_t crc = calculateCRC(buffer, 5 + dataLen);
       buffer[5 + dataLen] = crc;

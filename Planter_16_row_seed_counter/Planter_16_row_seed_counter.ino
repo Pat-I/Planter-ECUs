@@ -512,6 +512,7 @@ void SendRowStatus() {
   rowStatus[rowStatusSize - 1] = CK_A;
 
   SerialPop.write(rowStatus, rowStatusSize);
+  memset(&rowStatus[6], 0, 3);
 }
 
 void ISR0() {

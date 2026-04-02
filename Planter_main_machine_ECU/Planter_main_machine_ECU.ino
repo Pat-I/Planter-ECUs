@@ -1,8 +1,8 @@
 
 
-char arduinoDate[] = "2026-03-28";
+char arduinoDate[] = "2026-03-31";
 char firmwareName[] = "JD1770NT main machine ECU";
-char arduinoVersion[] = "v 1.0.4";
+char arduinoVersion[] = "v 1.0.5";
 
 /*  PWM Frequency -> 
    *   490hz (default) = 0
@@ -153,9 +153,8 @@ void loop() {
     AOGtoCAN[2] = serialSource;
     AOGtoCAN[3] = serialPgn;
     AOGtoCAN[4] = serialLength;
-    for (uint8_t i = 0; i < serialLength; i++) {
-      AOGtoCAN[i + 5] = serialData[i];
-    }
+
+    memcpy(&AOGtoCAN[5], serialData, serialLength);
     AOGtoCAN[serialLength + 5] = serialCRC;
 
     EncodeAOGtoCAN();
@@ -181,10 +180,7 @@ void CheckDataFromCAN() {
       buffer[4] = dataLen;
 
       if (dataLen > 0) {
-        //memcpy(&buffer[5], data, dataLen);
-        for (uint8_t j = 0; j < dataLen; j++) {
-          buffer[j + 5] = CANreceiveBuffer[i][j + 6];
-        }
+        memcpy(&buffer[5], &CANreceiveBuffer[i][6], dataLen);
       }
 
       uint8_t crc = calculateCRC(buffer, 5 + dataLen);

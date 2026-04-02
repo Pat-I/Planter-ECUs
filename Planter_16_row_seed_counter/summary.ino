@@ -64,8 +64,8 @@ void Summary() {
   pop2_data[pop2_dataSize - 1] = ck_a;
   SerialPop.write(pop2_data, pop2_dataSize);
 
-memset(&pop_data[5], 0, 8);
-memset(&pop2_data[5], 0, 8);
+  memset(&pop_data[5], 0, 8);
+  memset(&pop2_data[5], 0, 8);
 #endif
 
   //build the spacing PGNs
@@ -98,8 +98,8 @@ memset(&pop2_data[5], 0, 8);
   space2_data[space2_dataSize - 1] = ck_a;
   SerialPop.write(space2_data, space2_dataSize);
 
-memset(&space_data[5], 0, 8);
-memset(&space2_data[5], 0, 8);
+  memset(&space_data[5], 0, 8);
+  memset(&space2_data[5], 0, 8);
 
   //build singulation PGNs
   byteIndex = 5;
@@ -128,8 +128,8 @@ memset(&space2_data[5], 0, 8);
   sin2_data[sin2_dataSize - 1] = ck_a;
   SerialPop.write(sin2_data, sin2_dataSize);
 
-memset(&sin_data[5], 0, 8);
-memset(&sin2_data[5], 0, 8);
+  memset(&sin_data[5], 0, 8);
+  memset(&sin2_data[5], 0, 8);
 
   //build Summary PGN
   uint8_t activeRows = 0;
@@ -176,7 +176,7 @@ memset(&sin2_data[5], 0, 8);
   int16_t out_sing = sum_singulationX10;
   rc_summary[11] = (uint8_t)out_sing;
   rc_summary[12] = out_sing >> 8;
-  
+
   ck_a = 0;
 
   for (int16_t i = 2; i < rc_summarySize - 1; i++) {
