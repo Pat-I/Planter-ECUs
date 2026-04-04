@@ -1,7 +1,7 @@
 
 
-char arduinoDate[] = "2026-03-29";
-char arduinoVersion[] = "v 1.0.6";
+char arduinoDate[] = "2026-04-03";
+char arduinoVersion[] = "v 1.0.7";
 
 //#define SERIAL_POP_COUNTER  //show the number of seed passed per row in the serial monitor,
 
@@ -170,10 +170,10 @@ uint32_t sum_singulationX10 = 0;
 uint32_t sum_populationD10 = 0;
 uint8_t byteIndex = 5;
 //skip double detail data
-uint8_t millisForArray = 5;
+uint16_t millisForArray = 5;
 uint8_t sk_skips[16];
 uint8_t dbl_doubles[16];
-uint8_t millisAtDblCount = 0;
+uint16_t millisAtDblCount = 0;
 //statusdetail
 uint8_t rc_seedCount[16];
 uint8_t rc_skips[16];
@@ -358,10 +358,10 @@ void loop() {
       sendDetail(dbl_doubles, dbl_data);
       sendDetail(sk_skips, sk_data);
       millisAtDblCount = 0;
+      statusDetail();
     }
 
     if (millisAtSCount >= 10) {
-      statusDetail();
       Summary();
       millisAtSCount = 0;
       if (sendConfigBack++ > 10) {
@@ -454,7 +454,7 @@ void loop() {
         //byte 5
         planterSettings.rxArraySpeed = serialData[0];
         // conversions
-        millisForArray = planterSettings.rxArraySpeed;
+        millisForArray = planterSettings.rxArraySpeed * 10;
       }
     }  // recv data
 
