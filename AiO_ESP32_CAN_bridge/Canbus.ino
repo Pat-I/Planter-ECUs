@@ -26,6 +26,9 @@ void Caninit() {
   // TWAI_MODE_NO_ACK allows the message to send without an external node acknowledging it.
   twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT((gpio_num_t)CAN_TX, (gpio_num_t)CAN_RX, TWAI_MODE_NO_ACK);
 
+  g_config.tx_queue_len = 64;  // High buffer for AgOpenGPS bursts
+  g_config.rx_queue_len = 64;  // High buffer for receiving bursts
+
   // 2. Timing Config: Set to 250kbps to match your Teensy
   twai_timing_config_t t_config = TWAI_TIMING_CONFIG_250KBITS();
 
@@ -49,19 +52,19 @@ void Caninit() {
 }
 
 void CanDecode() {
+  if (twai_receive(&RCV, pdMS_TO_TICKS(0)) == ESP_OK) {  //received a sentence
 
-  CanCheckOldArray();
+    CanCheckOldArray();
 
-  //check for an empty byte array
-  uint8_t arrayNbr = 15;
-  for (uint8_t j = 0; j < 8; j++) {
-    if (CANreceiveBuffer[j][0] == 0) {
-      arrayNbr = j;
-      break;
+    //check for an empty byte array
+    uint8_t arrayNbr = 17;
+    for (uint8_t j = 0; j < 16; j++) {
+      if (CANreceiveBuffer[j][0] == 0) {
+        arrayNbr = j;
+        break;
+      }
     }
-  }
-  if (arrayNbr < 8) {                                      //we have an empty array
-    if (twai_receive(&RCV, pdMS_TO_TICKS(0)) == ESP_OK) {  //received a sentence
+    if (arrayNbr < 8) {  //we have an empty array
       uint32_t id = RCV.identifier;
       uint8_t idflag = (id >> 16) & 0xFF;
       uint8_t idSrc = (id >> 8) & 0xFF;
@@ -86,16 +89,15 @@ void CanDecode() {
         memcpy(&CANreceiveBuffer[arrayNbr][5], RCV.data, 8);
       } else if (idflag == 0) {  //flag is 0, extended AOG PGN over multiple CAN sentences
         //more that 8 bytes payload
-        //buf[0] -> 4bytes message number and 4 bytes number of messages for all sentences
+        //buf[0] -> message number of the serie
         //buf[1] is a sequence nbr
         //buf[2] of the first message is the number of data bytes
         //so first will contain a payload of 5 bytes, all others contain 6 bytes. the last byte will be the AOG CRC
 
-        uint8_t messageNbr = (RCV.data[0] >> 4) & 0x0F;
-        uint8_t messageTotal = RCV.data[0] & 0x0F;
+        uint8_t messageNbr = RCV.data[0];
         uint8_t sequenceNbr = RCV.data[1];
 
-        if (messageNbr == 1) {  //new message
+        if (messageNbr == 1 && arrayNbr < 8) {  //new message
           //write the message
           CANreceiveBuffer[arrayNbr][0] = 2;            //this mean we are writing a longer PGN
           CANreceiveBuffer[arrayNbr][1] = 0;            //loop counter
@@ -109,6 +111,7 @@ void CanDecode() {
           for (uint8_t k = 0; k < 8; k++) {
             if (messageNbr == CANreceiveBuffer[k][0] && sequenceNbr == CANreceiveBuffer[k][2] && idSrc == CANreceiveBuffer[k][3] && idDest == CANreceiveBuffer[k][4]) {
               //It's the next message
+              uint8_t messageTotal = ((CANreceiveBuffer[k][5] + 6) / 6);
               if (messageNbr < messageTotal) {
                 CANreceiveBuffer[k][0] = messageNbr + 1;
               } else {
@@ -147,54 +150,49 @@ void CanCheckOldArray() {
   }
 }
 
-void EncodeAOGtoCAN() {
-  //Input format: 0x80, 0x81, source, dest, lenght, data ........, CRC
-  if (AOGtoCAN[2] > 0 && AOGtoCAN[3] > 0) {  //something to send
-    uint8_t leng = min(AOGtoCAN[4], (uint8_t)245);
-    if (leng == 8) {  //single sentence std 8 bytes
-      CanEncode(1, AOGtoCAN[2], AOGtoCAN[3], AOGtoCAN[5], AOGtoCAN[6], AOGtoCAN[7], AOGtoCAN[8], AOGtoCAN[9], AOGtoCAN[10], AOGtoCAN[11], AOGtoCAN[12]);
-    } else if (leng < 8) {  //single sentence less than 8 bytes
-      CanEncode(2, AOGtoCAN[2], AOGtoCAN[3], AOGtoCAN[4], AOGtoCAN[5], AOGtoCAN[6], AOGtoCAN[7], AOGtoCAN[8], AOGtoCAN[9], AOGtoCAN[10], AOGtoCAN[11]);
-    } else {  //multiple sentences
+void EncodeAOGtoCAN(const uint8_t* data, uint8_t dataLen) {
+  // data[2] = src, data[3] = dest, data[4] = length
+  if (dataLen > 4 && data[2] > 0 && data[3] > 0) {
+    uint8_t src = data[2];
+    uint8_t dest = data[3];
+    uint8_t leng = data[4];
+
+    if (leng == 8) {
+      CanEncode(1, src, dest, &data[5]);
+    } else if (leng < 8) {
+      CanEncode(2, src, dest, &data[4]);
+    } else {
       AOGtoCANseq++;
-      uint8_t NumberOfMessages = (leng + 1) / 6;
-      uint8_t messageNumber = (NumberOfMessages & 0x0F) | ((1 & 0x0F) << 4);
-      //first message
-      //flag, source, dest, nbr/total, sequence, lenght, data 0-4
-      CanEncode(0, AOGtoCAN[2], AOGtoCAN[3], messageNumber, AOGtoCANseq, leng, AOGtoCAN[5], AOGtoCAN[6], AOGtoCAN[7], AOGtoCAN[8], AOGtoCAN[9]);
-      for (uint8_t i = 1; i < NumberOfMessages; i++) {
-        messageNumber = (NumberOfMessages & 0x0F) | (((i + 1) & 0x0F) << 4);
-        CanEncode(0, AOGtoCAN[2], AOGtoCAN[3], messageNumber, AOGtoCANseq, AOGtoCAN[i * 6 + 4], AOGtoCAN[i * 6 + 5], AOGtoCAN[i * 6 + 6], AOGtoCAN[i * 6 + 7], AOGtoCAN[i * 6 + 8], AOGtoCAN[i * 6 + 9]);
+      uint8_t numMsgs = (leng + 6) / 6;
+
+      // --- Premier message ---
+      uint8_t firstBuf[8] = { 1, AOGtoCANseq, leng, 0, 0, 0, 0, 0 };
+      memcpy(&firstBuf[3], &data[5], 5);
+      CanEncode(0, src, dest, firstBuf);
+
+      // --- Messages suivants ---
+      const uint8_t* dataPtr = &data[10];
+      for (uint8_t i = 1; i < numMsgs; i++) {
+        uint8_t nextBuf[8] = { (uint8_t)(i + 1), AOGtoCANseq, 0, 0, 0, 0, 0, 0 };
+        memcpy(&nextBuf[2], dataPtr, 6);
+        CanEncode(0, src, dest, nextBuf);
+        dataPtr += 6;
       }
     }
-    memset(&AOGtoCAN[2], 0, (leng + 4));
   }
 }
 
-void CanEncode(uint8_t flag, uint8_t src, uint8_t dest, uint8_t data0, uint8_t data1, uint8_t data2, uint8_t data3, uint8_t data4, uint8_t data5, uint8_t data6, uint8_t data7) {
-
-  //uint32_t id = dest | src << 8 | 1 << 16;
-  twai_message_t SendCan8 = { 0 };
+inline void CanEncode(uint8_t flag, uint8_t src, uint8_t dest, const uint8_t* dPtr) {
+  twai_message_t message = { 0 };
   uint32_t id = (dest & 0xFF) | ((src & 0xFF) << 8) | ((flag & 0xFF) << 16);
-  SendCan8.identifier = id;
-  SendCan8.extd = 1;
-  SendCan8.rtr = 0;
-  SendCan8.data_length_code = 8;
+  message.identifier = id;
+  message.extd = 1;
+  message.rtr = 0;
+  message.data_length_code = 8;
 
-  SendCan8.data[0] = data0;
-  SendCan8.data[1] = data1;
-  SendCan8.data[2] = data2;
-  SendCan8.data[3] = data3;
-  SendCan8.data[4] = data4;
-  SendCan8.data[5] = data5;
-  SendCan8.data[6] = data6;
-  SendCan8.data[7] = data7;
+  // Copie les 8 octets d'un coup dans le tableau 'data' de la structure TWAI
+  memcpy(message.data, dPtr, 8);
 
-  //ESP32Can.writeFrame(SendCan8, 1);
-  // Queue message for transmission
-  if (twai_transmit(&SendCan8, pdMS_TO_TICKS(1)) == ESP_OK) {
-    //Serial.println("Message successfully queued for transmission");
-  } else {
-    Serial.println("Failed to queue message");
-  }
+  // Transmet avec un timeout très court (1ms) pour ne pas bloquer la loop
+  twai_transmit(&message, pdMS_TO_TICKS(1));
 }

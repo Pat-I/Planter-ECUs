@@ -1,8 +1,8 @@
 
 
-char arduinoDate[] = "2026-03-31";
+char arduinoDate[] = "2026-04-05";
 char firmwareName[] = "JD1770NT main machine ECU";
-char arduinoVersion[] = "v 1.0.5";
+char arduinoVersion[] = "v 1.0.6";
 
 /*  PWM Frequency -> 
    *   490hz (default) = 0
@@ -12,14 +12,15 @@ char arduinoVersion[] = "v 1.0.5";
 #define PWM_Frequency 1
 
 //loop time variables in milliseconds
-const byte LOOP_TIME = 100;  // 10Hz
-unsigned long lastTime = LOOP_TIME;
-unsigned long currentTime = LOOP_TIME;
+const uint8_t LOOP_TIME = 100;  // 10Hz
+uint32_t lastTime = LOOP_TIME;
+uint32_t currentTime = LOOP_TIME;
 
 //communication
-uint8_t CANreceiveBuffer[8][255];
-uint8_t AOGtoCAN[255] = { 0 };  // Forces all elements to 0
+uint8_t CANreceiveBuffer[16][288];
+uint8_t AOGtoCAN[288] = { 0 };  // Forces all elements to 0
 uint8_t AOGtoCANseq = 0;
+void EncodeAOGtoCAN(const uint8_t* data, uint8_t dataLen, bool isSentToAOG = true); //to make the compiler happy, probably because of the optional argument
 
 ///////main for the pop serial reading/////////////////////////////////////////////////////////
 #define SerialPop Serial1
@@ -28,10 +29,10 @@ uint8_t popTxBuffer[2048];
 uint32_t bautPop = 460800;
 //Parsing PGN
 bool isHeaderFound = false;
-int16_t tempHeader = 0;
+uint16_t tempHeader = 0;
 bool isLengthFound = false;
-int header = 0;
-int temp = 0;
+uint16_t header = 0;
+uint16_t temp = 0;
 uint8_t serialSource = 0;
 uint8_t serialPgn = 0;
 uint8_t serialLength = 0;
@@ -128,24 +129,18 @@ void loop() {
     if (header == 32897) isHeaderFound = true;  //Do we have a match?
   }
 
-  if (SerialPop.available() > 2 && isHeaderFound && !isLengthFound) {
+  if (isHeaderFound && !isLengthFound && SerialPop.available() > 2) {
     serialSource = SerialPop.read();
     serialPgn = SerialPop.read();
     serialLength = SerialPop.read();
-    isLengthFound = true;
+    if (serialLength > 0) isLengthFound = true;
+    else isHeaderFound = false;  //corupt data
   }
 
-  if (SerialPop.available() > serialLength && isHeaderFound && isLengthFound) {
+  if (isLengthFound && SerialPop.available() > serialLength) {
     //We have all data, reset for next time
     isHeaderFound = false;
     isLengthFound = false;
-
-    for (uint8_t i = 0; i < serialLength; i++) {
-      serialData[i] = SerialPop.read();
-    }
-    serialCRC = SerialPop.read();
-
-    //todo: check CRC, if bad, return, if good continue
 
     //send to CAN3
     AOGtoCAN[0] = 0x80;
@@ -153,17 +148,17 @@ void loop() {
     AOGtoCAN[2] = serialSource;
     AOGtoCAN[3] = serialPgn;
     AOGtoCAN[4] = serialLength;
+    SerialPop.readBytes(&AOGtoCAN[5], serialLength + 1);
+    //todo: check CRC, if bad, return, if good continue
 
-    memcpy(&AOGtoCAN[5], serialData, serialLength);
-    AOGtoCAN[serialLength + 5] = serialCRC;
-
-    EncodeAOGtoCAN();
+    EncodeAOGtoCAN(AOGtoCAN, serialLength + 6);
+    memset(AOGtoCAN, 0, serialLength + 6);
   }
   /////////end of serial to CAN//////////////////////
 }  // end of loop
 
 void CheckDataFromCAN() {
-  for (uint8_t i = 0; i < 8; i++) {
+  for (uint8_t i = 0; i < 16; i++) {
     if (CANreceiveBuffer[i][0] == 1) {
       CANreceiveBuffer[i][0] = 0;  //read and ready to be re-used
 
@@ -186,7 +181,9 @@ void CheckDataFromCAN() {
       uint8_t crc = calculateCRC(buffer, 5 + dataLen);
       buffer[5 + dataLen] = crc;
 
-      if (dataSrc == 123 || (dataSrc == 127 && dataPGN == 239)) SerialPop.write(buffer, 6 + dataLen);
+      if (dataSrc == 123 || (dataSrc == 127 && dataPGN == 239)) {
+        SerialPop.write(buffer, 6 + dataLen);
+      }
     }
   }
 }

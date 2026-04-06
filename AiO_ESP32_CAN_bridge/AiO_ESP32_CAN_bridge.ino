@@ -1,9 +1,9 @@
 // ESP32_BRIDGE_EXAMPLE.cpp
 // Example ESP32 code for v26 Serial-to-WiFi Bridge
 // This demonstrates the basic structure needed to communicate with v26
-char arduinoDate[] = "2026-03-31";
+char arduinoDate[] = "2026-04-05";
 char firmwareName[] = "AiO_ESP32 CAN bridge";
-char arduinoVersion[] = "v 1.0.4";
+char arduinoVersion[] = "v 1.0.5";
 
 #include <Arduino.h>
 #include "driver/twai.h"  // Required for status functions
@@ -15,7 +15,7 @@ struct PGNMessage {
   uint8_t source;
   uint8_t pgn;
   uint8_t length;
-  uint8_t data[250];  // Max data size
+  uint8_t data[256];  // Max data size
   uint8_t crc;
 };
 
@@ -24,15 +24,15 @@ uint8_t rxBuffer[512];
 size_t rxIndex = 0;
 
 // Timing
-unsigned long lastHelloTime = 0;
-unsigned long lastStatusTime = 0;
+uint32_t lastHelloTime = 0;
+uint32_t lastStatusTime = 0;
 
 // Connection state
 bool teensynDetected = false;
 
 //CANBUS communication
-uint8_t CANreceiveBuffer[8][255];
-uint8_t AOGtoCAN[255] = { 0 };  // Forces all elements to 0
+uint8_t CANreceiveBuffer[16][288];
+uint8_t AOGtoCAN[288] = { 0 };  // Forces all elements to 0
 uint8_t AOGtoCANseq = 0;
 
 // Calculate CRC for PGN message
@@ -126,7 +126,8 @@ void handlePGN(uint8_t source, uint8_t pgn, uint8_t* data, uint8_t length) {
 
   memcpy(&AOGtoCAN[5], data, length + 1);
 
-  EncodeAOGtoCAN();
+  EncodeAOGtoCAN(AOGtoCAN, length + 6);
+  memset(AOGtoCAN, 0, length + 6);
 }
 
 // Example: Send a status PGN
@@ -196,7 +197,7 @@ void loop() {
 }
 
 void CheckDataFromCAN() {
-  for (uint8_t i = 0; i < 8; i++) {
+  for (uint8_t i = 0; i < 16; i++) {
     if (CANreceiveBuffer[i][0] == 1) {
       CANreceiveBuffer[i][0] = 0;  //read and ready to be re-used
 
