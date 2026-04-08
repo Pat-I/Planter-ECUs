@@ -3,6 +3,58 @@
 char arduinoDate[] = "2026-04-05";
 char firmwareName[] = "JD1770NT main machine ECU";
 char arduinoVersion[] = "v 1.0.6";
+/*
+Teensy Pinout
+GND
+0 (ECU pin 25-53 IN) RX1 SerialPop
+1 (ECU pin 26-54 OUT) TX1 SerialPop
+2 (ECU pin 36)Pin9 digital input from PWR circuit
+3 (ECU pin 1)Pin1 output
+4 (ECU pin 29)Pin2 output
+5 (ECU pin 30)Pin3 output
+6 (ECU pin 31)Pin4 output
+7 (ECU pin 32)Pin5 output
+8 (ECU pin 33)Pin6 output
+9 (ECU pin 34)Pin7 output
+10 (ECU pin 35)Pin8 output
+11 (ECU pin 48) digital input3
+12 (ECU pin 47) digital input4
+3.3V
+24
+25
+26
+27
+28 (ECU pin 49) digital input2
+29 (ECU pin 50) digital input1
+30 (ECU pin 27-55 CANL) rxCAN AiO
+31 (ECU pin 28-56 CANH) txCAN AiO
+32
+---------
+Vin
+GND
+3.3V
+23 A9 (ECU pin 14) Pin16
+22 A8 (ECU pin 42) Pin15
+21
+20
+19 A5 (ECU pin 41) Pin14
+18 A4 (ECU pin 40) Pin13
+17 (ECU pin 51 A) TX4 RS485-2 unused
+16 (ECU pin 23 B) RX4 RS485-2 unused
+15
+14
+13
+GND
+41 A17 (ECU pin 19) analog input4
+40 A16 (ECU pin 20) analog input3
+39 A15 (ECU pin 21) analog input2
+38 A14 (ECU pin 22) analog input1
+37 (ECU pin 1) Pin12 digital input from PWR circuit
+36 (ECU pin 1) Pin11 digital input from PWR circuit
+35 (ECU pin 52 A) TX8 RS485-1 downforce
+34 (ECU pin 24 B) RX8 RS485-1 downforce
+33 (ECU pin 1) Pin10 digital input from PWR circuit
+*/
 
 /*  PWM Frequency -> 
    *   490hz (default) = 0
@@ -42,14 +94,14 @@ uint8_t serialCRC = 0;
 
 
 //define inputs and outputs
-#define PWM1_CYTRON 3
-#define DIR1_CYTRON 4
+//#define PWM1_CYTRON 3
+//#define DIR1_CYTRON 4
 
-#define BOUTON_UP 6
-#define BOUTON_DOWN 7
+//#define BOUTON_UP 6
+//#define BOUTON_DOWN 7
 
-#define POTO_UP A0
-#define POTO_DOWN A1
+//#define POTO_UP A0
+//#define POTO_DOWN A1
 
 void setup() {
   //PWM rate settings. Set them both the same!!!!
@@ -73,9 +125,9 @@ void setup() {
   SerialPop.addMemoryForRead(popRxBuffer, sizeof(popRxBuffer));
   SerialPop.addMemoryForWrite(popTxBuffer, sizeof(popTxBuffer));
   //pinMode is only for digital pins?
-  pinMode(BOUTON_UP, INPUT);  //INSTEAD INPUT_PULLUP, not needed?
-  pinMode(BOUTON_DOWN, INPUT);
-  pinMode(DIR1_CYTRON, OUTPUT);
+  //pinMode(BOUTON_UP, INPUT);  //INSTEAD INPUT_PULLUP, not needed?
+  //pinMode(BOUTON_DOWN, INPUT);
+  //pinMode(DIR1_CYTRON, OUTPUT);
 
 
 
@@ -103,8 +155,8 @@ void loop() {
     lastTime = currentTime;
 
     CanCheckOldArray();
-    analogRead(BOUTON_UP);
-    analogWrite(PWM1_CYTRON, 128);
+    //analogRead(BOUTON_UP);
+    //analogWrite(PWM1_CYTRON, 128);
 
 
 
