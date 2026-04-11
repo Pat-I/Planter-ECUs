@@ -68,11 +68,35 @@ const uint8_t LOOP_TIME = 100;  // 10Hz
 uint32_t lastTime = LOOP_TIME;
 uint32_t currentTime = LOOP_TIME;
 
+//EEPROM
+#include <EEPROM.h>
+#define EEP_Ident 0x5422
+int16_t EEread = 0;
+struct Storage {
+  uint16_t heightDown = 55;
+  uint16_t heightUp = 1600;
+  uint8_t OnThreshold = 50;
+  uint8_t OffThreshold = 100;
+  uint16_t vaccum1zero = 55;
+  uint16_t vaccum2zero = 55;
+  int16_t vaccum1multi = 1000;
+  int16_t vaccum2multi = 1000;
+  uint16_t downforce1zero = 55;
+  int16_t downforce1multi = 1000;
+  uint16_t downforce2zero = 55;
+  int16_t downforce2multi = 1000;
+  uint16_t downforce3zero = 55;
+  int16_t downforce3multi = 1000;
+  uint16_t downPressureZero = 55;
+  int16_t downPressureMulti = 1000;
+};
+Storage settings;  //30 bytes
+
 //communication
 uint8_t CANreceiveBuffer[16][288];
 uint8_t AOGtoCAN[288] = { 0 };  // Forces all elements to 0
 uint8_t AOGtoCANseq = 0;
-void EncodeAOGtoCAN(const uint8_t* data, uint8_t dataLen, bool isSentToAOG = true); //to make the compiler happy, probably because of the optional argument
+void EncodeAOGtoCAN(const uint8_t* data, uint8_t dataLen, bool isSentToAOG = true);  //to make the compiler happy, probably because of the optional argument
 
 ///////main for the pop serial reading/////////////////////////////////////////////////////////
 #define SerialPop Serial1
@@ -94,14 +118,25 @@ uint8_t serialCRC = 0;
 
 
 //define inputs and outputs
+//outputs
 //#define PWM1_CYTRON 3
 //#define DIR1_CYTRON 4
 
+//digital inputs
 //#define BOUTON_UP 6
 //#define BOUTON_DOWN 7
 
+//analog inputs
+#define HEIGHT_SENSOR A14
 //#define POTO_UP A0
 //#define POTO_DOWN A1
+
+//input/output variables
+uint16_t heightRaw = 0;
+uint8_t heightPlanter;
+uint8_t onThreshold = 50;
+uint8_t offThreshold = 100;
+/////////////////////////////////////////////////////////////////////////////////////////////
 
 void setup() {
   //PWM rate settings. Set them both the same!!!!
@@ -124,23 +159,39 @@ void setup() {
   SerialPop.begin(bautPop);
   SerialPop.addMemoryForRead(popRxBuffer, sizeof(popRxBuffer));
   SerialPop.addMemoryForWrite(popTxBuffer, sizeof(popTxBuffer));
+
+  analogReadResolution(12);  //read 0-4095 on analog pins
+  analogReadAveraging(8);    //takes 15us
+  //set the inputs independantly from the pin names
+  pinMode(A14, INPUT_DISABLE);  //analog input1
+  pinMode(A15, INPUT_DISABLE);  //analog input2
+  pinMode(A16, INPUT_DISABLE);  //analog input3
+  pinMode(A17, INPUT_DISABLE);  //analog input4
+  pinMode(29, INPUT_PULLUP);    //digital1
+  pinMode(28, INPUT_PULLUP);    //digital2
+  pinMode(11, INPUT_PULLUP);    //digital3
+  pinMode(12, INPUT_PULLUP);    //digital4
+
   //pinMode is only for digital pins?
   //pinMode(BOUTON_UP, INPUT);  //INSTEAD INPUT_PULLUP, not needed?
   //pinMode(BOUTON_DOWN, INPUT);
   //pinMode(DIR1_CYTRON, OUTPUT);
 
+  //EEPROM
+  EEPROM.get(0, EEread);  // read identifier
 
-
-
-
+  if (EEread != EEP_Ident)  // check on first start and write EEPROM
+  {
+    EEPROM.put(0, EEP_Ident);
+    EEPROM.put(6, settings);  //Machine
+  } else {
+    EEPROM.get(6, settings);  //Machine
+  }
 
   delay(100);
   Serial.println(firmwareName);
   Serial.println(arduinoVersion);
   Serial.println(arduinoDate);
-
-
-
 
   Caninit();
 }
@@ -157,12 +208,36 @@ void loop() {
     CanCheckOldArray();
     //analogRead(BOUTON_UP);
     //analogWrite(PWM1_CYTRON, 128);
+    heightRaw = analogRead(HEIGHT_SENSOR);
+    int32_t tempHeight = map(heightRaw, settings.heightDown, settings.heightUp, 1, 255);
+    heightPlanter = constrain(tempHeight, 1, 255);
+    Serial.print(heightPlanter);
+    Serial.print(", ");
+    Serial.println(heightRaw);
 
 
 
 
-
-
+    //Send the Height PGN
+    AOGtoCAN[0] = 0x80;
+    AOGtoCAN[1] = 0x81;
+    AOGtoCAN[2] = 0x7B;  //Source
+    AOGtoCAN[3] = 0xA0;  //PGN
+    AOGtoCAN[4] = 8;     //lenght
+    AOGtoCAN[5] = highByte(heightRaw);
+    AOGtoCAN[6] = lowByte(heightRaw);
+    AOGtoCAN[7] = heightPlanter;
+    // no AOGtoCAN[8]
+    AOGtoCAN[9] = onThreshold;
+    AOGtoCAN[10] = offThreshold;
+    // no AOGtoCAN[11]
+    // no AOGtoCAN[12]
+    //do CRC
+    uint8_t crc = calculateCRC(AOGtoCAN, 13);
+      AOGtoCAN[13] = crc;
+    SerialPop.write(AOGtoCAN, 14);
+    EncodeAOGtoCAN(AOGtoCAN, 14);
+    memset(AOGtoCAN, 0, 14);
 
   }  // end of 100 ms loop
 

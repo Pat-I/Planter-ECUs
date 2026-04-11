@@ -148,6 +148,9 @@ bool isRowRecoring[16];  //this is went AOG command on and the planter is lowere
 bool ReceivedFirstSeed[16];
 bool isPlanterLowered = true;
 uint8_t sectionStatus[2];
+uint8_t heightPlanter = 0;
+uint8_t onThreshold = 0;
+uint8_t offThreshold = 0;
 
 uint8_t millisSectionStatus = 0;
 //Summary
@@ -400,12 +403,24 @@ void loop() {
 
     //todo: check CRC, if bad, return, if good continue
 
-    if (serialSource == 123)  // from AOG Planter monitor
+    if (serialSource == 123)  // 7B from AOG Planter monitor
     {
+      if (serialPgn == 160)  //A0 Height
+      {
+        //dont read 0 and 1 raw height
+        heightPlanter = serialData[2];
+        //no 3
+        onThreshold = serialData[4];
+        offThreshold = serialData[5];
+        //no 6, 7
+
+        if (heightPlanter < onThreshold) isPlanterLowered = true;
+        if (heightPlanter > offThreshold) isPlanterLowered = false;
+      }
       if (serialPgn == 224)  //E0 PlanterConfigData
       {
-        Serial.println("config received");
-        digitalToggle(13);
+        //Serial.println("config received");
+        digitalWrite(13, LOW);
         //byte 5
         planterSettings.rxNumPlanterRows = serialData[0];  //16
 
