@@ -63,6 +63,10 @@ GND
    */
 #define PWM_Frequency 1
 
+//Used to set CPU speed
+extern "C" uint32_t set_arm_clock(uint32_t frequency);
+extern float tempmonGetTemp(void);
+
 //loop time variables in milliseconds
 const uint8_t LOOP_TIME = 100;  // 10Hz
 uint32_t lastTime = LOOP_TIME;
@@ -139,6 +143,8 @@ uint8_t offThreshold = 100;
 /////////////////////////////////////////////////////////////////////////////////////////////
 
 void setup() {
+  // Core at 150 MHz (To reduce heat)
+  set_arm_clock(150000000);
   //PWM rate settings. Set them both the same!!!!
   /*  PWM Frequency ->
        490hz (default) = 0
@@ -234,7 +240,7 @@ void loop() {
     // no AOGtoCAN[12]
     //do CRC
     uint8_t crc = calculateCRC(AOGtoCAN, 13);
-      AOGtoCAN[13] = crc;
+    AOGtoCAN[13] = crc;
     SerialPop.write(AOGtoCAN, 14);
     EncodeAOGtoCAN(AOGtoCAN, 14);
     memset(AOGtoCAN, 0, 14);

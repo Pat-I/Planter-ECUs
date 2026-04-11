@@ -504,9 +504,8 @@ void CheckRowStatus() {
   if (isPlanterLowered) {
     //check if section is on
     for (uint8_t i = 0; i < numPlanterRows; i++) {
-      uint8_t byteNbr = i / 8;
 
-      isRowRecoring[i] = bitRead(sectionStatus[byteNbr], i - byteNbr * 8);
+      isRowRecoring[i] = bitRead(sectionStatus[i / 8], i % 8);
       //if (!isRowRecoring[i]) {
       //ReceivedFirstSeed[i] = false;
       //sensorAllGapsIndex[i] = 0;
