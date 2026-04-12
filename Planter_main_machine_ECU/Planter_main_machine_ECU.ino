@@ -1,8 +1,8 @@
 
 
-char arduinoDate[] = "2026-04-05";
+char arduinoDate[] = "2026-04-11";
 char firmwareName[] = "JD1770NT main machine ECU";
-char arduinoVersion[] = "v 1.0.6";
+char arduinoVersion[] = "v 1.0.7";
 /*
 Teensy Pinout
 GND
@@ -98,6 +98,7 @@ Storage settings;  //30 bytes
 
 //communication
 uint8_t CANreceiveBuffer[16][288];
+uint8_t globalBuffer[288];
 uint8_t AOGtoCAN[288] = { 0 };  // Forces all elements to 0
 uint8_t AOGtoCANseq = 0;
 void EncodeAOGtoCAN(const uint8_t* data, uint8_t dataLen, bool isSentToAOG = true);  //to make the compiler happy, probably because of the optional argument
@@ -297,25 +298,24 @@ void CheckDataFromCAN() {
 
       //format:
       // code, loopCounter, sequence, Source, Dest, lenght, Data......., CRC (only if data > 8)
-      uint8_t buffer[256];
       uint8_t dataSrc = CANreceiveBuffer[i][3];
       uint8_t dataPGN = CANreceiveBuffer[i][4];
       uint8_t dataLen = CANreceiveBuffer[i][5];
-      buffer[0] = 0x80;
-      buffer[1] = 0x81;
-      buffer[2] = dataSrc;
-      buffer[3] = dataPGN;
-      buffer[4] = dataLen;
+      globalBuffer[0] = 0x80;
+      globalBuffer[1] = 0x81;
+      globalBuffer[2] = dataSrc;
+      globalBuffer[3] = dataPGN;
+      globalBuffer[4] = dataLen;
 
       if (dataLen > 0) {
-        memcpy(&buffer[5], &CANreceiveBuffer[i][6], dataLen);
+        memcpy(&globalBuffer[5], &CANreceiveBuffer[i][6], dataLen);
       }
 
-      uint8_t crc = calculateCRC(buffer, 5 + dataLen);
-      buffer[5 + dataLen] = crc;
+      uint8_t crc = calculateCRC(globalBuffer, 5 + dataLen);
+      globalBuffer[5 + dataLen] = crc;
 
       if (dataSrc == 123 || (dataSrc == 127 && dataPGN == 239)) {
-        SerialPop.write(buffer, 6 + dataLen);
+        SerialPop.write(globalBuffer, 6 + dataLen);
       }
     }
   }

@@ -1,8 +1,11 @@
 
 
-char arduinoDate[] = "2026-04-10";
+char arduinoDate[] = "2026-04-11";
 char firmwareName[] = "JD1770NT rowCommand ECU";
-char arduinoVersion[] = "v 1.0.0";
+char arduinoVersion[] = "v 1.0.1";
+
+bool engageFromHigh = true;
+uint8_t stopTime = 100;  // time the cluches remain powered if stopped secX10, 100 is 10 sec, max 200(20sec)
 /*
 Teensy Pinout
 GND
@@ -75,22 +78,10 @@ uint32_t currentTime = LOOP_TIME;
 
 //communication
 uint8_t CANreceiveBuffer[16][288];
+uint8_t globalBuffer[288];
 uint8_t AOGtoCAN[288] = { 0 };  // Forces all elements to 0
 uint8_t AOGtoCANseq = 0;
 void EncodeAOGtoCAN(const uint8_t* data, uint8_t dataLen, bool isSentToAOG = true);  //to make the compiler happy, probably because of the optional argument
-
-//define inputs and outputs
-//outputs
-//#define PWM1_CYTRON 3
-//#define DIR1_CYTRON 4
-
-//digital inputs
-//#define BOUTON_UP 6
-//#define BOUTON_DOWN 7
-
-//analog inputs
-//#define POTO_UP A0
-//#define POTO_DOWN A1
 
 //input/output variables
 bool isPlanterLowered = true;
@@ -102,6 +93,7 @@ uint8_t AOGSpeedX10 = 0;
 uint8_t millisSectionStatus = 0;
 bool isClutchPowered[16] = { 0 };
 uint8_t sectionStatus[2] = { 0 };
+uint8_t speedTimer = 0;
 /////////////////////////////////////////////////////////////////////////////////////////////
 
 void setup() {
@@ -159,23 +151,22 @@ void loop() {
   if (currentTime - lastTime >= LOOP_TIME) {
     lastTime = currentTime;
     millisSectionStatus++;
+
+    if (AOGSpeedX10 > 2) speedTimer = 0;
+    else if (speedTimer < 250) speedTimer++;
     // check if a field is connected
     if (millisSectionStatus > 3) {
       millisSectionStatus = 0;  // wait 0.4 sec to do it again if still no connection
 
       memset(isClutchPowered, 0, numPlanterRows);
       SetClutches();
+      AOGSpeedX10 = 0;
     }
 
     CanCheckOldArray();
-    //analogRead(BOUTON_UP);
-    //analogWrite(PWM1_CYTRON, 128);
-
   }  // end of 100 ms loop
 
-
   CanDecode();
-  //to add: read the CANreceiveBuffer
   CheckDataFromCAN();
 }  // end of loop
 
@@ -186,22 +177,21 @@ void CheckDataFromCAN() {
 
       //format:
       // code, loopCounter, sequence, Source, Dest, lenght, Data......., CRC (only if data > 8)
-      uint8_t buffer[256];
       uint8_t dataSrc = CANreceiveBuffer[i][3];
       uint8_t dataPGN = CANreceiveBuffer[i][4];
       uint8_t dataLen = CANreceiveBuffer[i][5];
-      buffer[0] = 0x80;
-      buffer[1] = 0x81;
-      buffer[2] = dataSrc;
-      buffer[3] = dataPGN;
-      buffer[4] = dataLen;
+      globalBuffer[0] = 0x80;
+      globalBuffer[1] = 0x81;
+      globalBuffer[2] = dataSrc;
+      globalBuffer[3] = dataPGN;
+      globalBuffer[4] = dataLen;
 
       if (dataLen > 0) {
-        memcpy(&buffer[5], &CANreceiveBuffer[i][6], dataLen);
+        memcpy(&globalBuffer[5], &CANreceiveBuffer[i][6], dataLen);
       }
 
-      uint8_t crc = calculateCRC(buffer, 5 + dataLen);
-      buffer[5 + dataLen] = crc;
+      uint8_t crc = calculateCRC(globalBuffer, 5 + dataLen);
+      globalBuffer[5 + dataLen] = crc;
 
       //read the revelent PGNs
 
@@ -210,13 +200,14 @@ void CheckDataFromCAN() {
         if (dataPGN == 160)  //A0 Height
         {
           //dont read 0 and 1 raw height
-          heightPlanter = buffer[7];
+          heightPlanter = globalBuffer[7];
           //no 3
-          onThreshold = buffer[9];
-          offThreshold = buffer[10];
+          onThreshold = globalBuffer[9];
+          offThreshold = globalBuffer[10];
           //no 6, 7
 
-          if (heightPlanter < offThreshold) isPlanterLowered = true;  //enable the clutch from height above
+          if (engageFromHigh && heightPlanter < offThreshold) isPlanterLowered = true;  //enable the clutch from the higher point
+          else if (heightPlanter < onThreshold) isPlanterLowered = true;                //enable the clutch from the lower point
           if (heightPlanter > offThreshold) isPlanterLowered = false;
         }
       }
@@ -225,20 +216,12 @@ void CheckDataFromCAN() {
       {
         if (dataPGN == 239)  //FE autoSteerData
         {
-          //Byte 5
-          //planterSettings.rxSpeedHi = serialData[0];
-
-          //Byte 6
-          //planterSettings.rxSpeedLo = serialData[1];
-          AOGSpeedX10 = buffer[6];
+          AOGSpeedX10 = globalBuffer[6];
           //Serial.print("Speed= ");
           //Serial.println(AOGSpeedX10);
 
-          //AOGSpeedX10 = (planterSettings.rxSpeedHi | planterSettings.rxSpeedLo << 8);  //
-          //AOGSpeed = (float)AOGSpeedX10 * 0.1f;  //
-
-          sectionStatus[0] = buffer[11];
-          sectionStatus[1] = buffer[12];
+          sectionStatus[0] = globalBuffer[11];
+          sectionStatus[1] = globalBuffer[12];
           millisSectionStatus = 0;
           CheckRowStatus();
         }
@@ -248,17 +231,15 @@ void CheckDataFromCAN() {
 }
 
 void CheckRowStatus() {
-  if (isPlanterLowered) {
+  if (isPlanterLowered && speedTimer < stopTime) {
     //check if section is on
     for (uint8_t i = 0; i < numPlanterRows; i++) {
 
       isClutchPowered[i] = !bitRead(sectionStatus[i / 8], i % 8);
     }
   } else {
-    //raised, stop recording
+    //raised, un-energize the cluches
     memset(isClutchPowered, 0, numPlanterRows);
-    //memset(ReceivedFirstSeed, 0, numPlanterRows);
-    //memset(sensorAllGapsIndex, 0, numPlanterRows);
   }
 
   SetClutches();
