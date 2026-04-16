@@ -76,7 +76,7 @@ uint32_t currentTime = LOOP_TIME;
 #include <EEPROM.h>
 #define EEP_Ident 0x5422
 int16_t EEread = 0;
-struct Storage {
+struct __attribute__((packed)) Storage {
   uint16_t heightDown = 55;
   uint16_t heightUp = 1600;
   uint8_t OnThreshold = 50;
@@ -309,13 +309,29 @@ void CheckDataFromCAN() {
 
       if (dataLen > 0) {
         memcpy(&globalBuffer[5], &CANreceiveBuffer[i][6], dataLen);
-      }
 
-      uint8_t crc = calculateCRC(globalBuffer, 5 + dataLen);
-      globalBuffer[5 + dataLen] = crc;
 
-      if (dataSrc == 123 || (dataSrc == 127 && dataPGN == 239)) {
-        SerialPop.write(globalBuffer, 6 + dataLen);
+        uint8_t crc = calculateCRC(globalBuffer, 5 + dataLen);
+        globalBuffer[5 + dataLen] = crc;
+
+        if (dataSrc == 123 || (dataSrc == 127 && dataPGN == 239)) {
+          SerialPop.write(globalBuffer, 6 + dataLen);
+        }
+        //other here
+        if (dataSrc == 123 && dataPGN == 161) {
+          //7B A1 height config
+          uint16_t temp = 0;
+          temp = ((uint16_t)globalBuffer[5] << 8) | (uint8_t)globalBuffer[6];
+          if (temp < 4096) settings.heightDown = temp;
+          temp = ((uint16_t)globalBuffer[7] << 8) | (uint8_t)globalBuffer[8];
+          if (temp < 4096) settings.heightUp = temp;
+          temp = (uint8_t)globalBuffer[9];
+          if (temp < 255) settings.OnThreshold = temp;
+          temp = (uint8_t)globalBuffer[10];
+          if (temp < 255) settings.OffThreshold = temp;
+
+          EEPROM.put(6, settings);
+        }
       }
     }
   }
