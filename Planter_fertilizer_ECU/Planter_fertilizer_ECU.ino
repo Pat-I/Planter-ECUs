@@ -55,8 +55,8 @@ GND
 38 A14 (ECU pin 22) analog input1 not used
 37 (ECU pin 1) Pin12 input
 36 (ECU pin 1) Pin11 input
-35 (ECU pin 52 A) TX8 not used
-34 (ECU pin 24 B) RX8 not used
+35 (ECU pin 52 A) TX8 RS485 fertilizer
+34 (ECU pin 24 B) RX8 Rs485 fertilizer
 33 (ECU pin 1) Pin10 input
 */
 uint8_t solenoid[] = { 3, 4, 5, 6, 7, 8, 9, 10 };
@@ -69,6 +69,15 @@ uint8_t forceOnTime[8];
    *   3921hz = 2
    */
 #define PWM_Frequency 1
+
+//EEPROM
+#include <EEPROM.h>
+#define EEP_Ident 0x5422
+int16_t EEread = 0;
+struct __attribute__((packed)) Storage {
+  int16_t fertilizerZero = 55;
+};
+Storage settings;  //30 bytes
 
 //Used to set CPU speed
 extern "C" uint32_t set_arm_clock(uint32_t frequency);
@@ -86,6 +95,17 @@ uint8_t AOGtoCAN[288] = { 0 };  // Forces all elements to 0
 uint8_t AOGtoCANseq = 0;
 void EncodeAOGtoCAN(const uint8_t* data, uint8_t dataLen, bool isSentToAOG = true);  //to make the compiler happy, probably because of the optional argument
 
+///////main for the pop serial reading/////////////////////////////////////////////////////////
+#define SerialRS485 Serial8
+uint8_t rs485RxBuffer[2048];
+uint8_t rs485TxBuffer[2048];
+uint32_t bautRS485 = 9600;
+//Parsing PGN
+bool isRS485HeaderFound = false;
+uint16_t RS485tempHeader = 0;
+uint16_t RS485header = 0;
+uint16_t RS485temp = 0;
+
 //input/output variables
 bool isPlanterLowered = true;
 uint8_t numPlanterRows = 16;
@@ -96,11 +116,14 @@ uint8_t offThreshold = 100;
 uint8_t AOGSpeedX10 = 0;
 uint8_t millisSectionStatus = 0;
 bool isSolenoidActive[8] = { 0 };
+bool isTrapOpen[8] = { 0 };
 uint8_t rowSectionStatus[2] = { 0 };
 bool fertilizerSectionStatus[8] = { 0 };  //true is fertilizing
 
 uint8_t speedTimer = 0;
 uint8_t solenoidActivationTimer[8] = { 0 };
+int16_t weightActual = 0;  //in kg
+int32_t weightRaw = 0;
 /////////////////////////////////////////////////////////////////////////////////////////////
 
 void setup() {
@@ -123,6 +146,9 @@ void setup() {
     //analogWriteFrequency(PWM2_RPWM, 3921);
   }
   Serial.begin(115200);
+  SerialRS485.begin(bautRS485);
+  SerialRS485.addMemoryForRead(rs485RxBuffer, sizeof(rs485RxBuffer));
+  SerialRS485.addMemoryForWrite(rs485TxBuffer, sizeof(rs485TxBuffer));
 
   analogReadResolution(12);  //read 0-4095 on analog pins
   analogReadAveraging(8);    //takes 15us
@@ -139,7 +165,19 @@ void setup() {
   //pinMode is only for digital pins?
   for (uint8_t i = 0; i < numSolenoid; i++) {
     pinMode(solenoid[i], OUTPUT);
-  };
+    pinMode(hall[i], INPUT_PULLUP);
+  }
+
+  //EEPROM
+  EEPROM.get(0, EEread);  // read identifier
+
+  if (EEread != EEP_Ident)  // check on first start and write EEPROM
+  {
+    EEPROM.put(0, EEP_Ident);
+    EEPROM.put(6, settings);  //Machine
+  } else {
+    EEPROM.get(6, settings);  //Machine
+  }
 
   delay(100);
   Serial.println(firmwareName);
@@ -176,11 +214,76 @@ void loop() {
       AOGSpeedX10 = 0;
     }
 
+    //send the fertilizer PGN 7B A6
+    //check trap position, reading HIGH is trap closed, LOW is trap open
+    for (uint8_t i = 0; i < numSolenoid; i++) {
+      isTrapOpen[i] = !digitalRead(hall[i]);
+    }
+    uint8_t setPos = 0;
+    uint8_t actPos = 0;
+    for (int i = 0; i < 8; i++) {
+      if (!isSolenoidActive[i]) {
+        setPos |= (1 << i);  // Set the bit at position 'i' to 1
+      }
+      if (isTrapOpen[i]) {
+        actPos |= (1 << i);  // Set the bit at position 'i' to 1
+      }
+    }
+    AOGtoCAN[0] = 0x80;
+    AOGtoCAN[1] = 0x81;
+    AOGtoCAN[2] = 0x7B;  //Source
+    AOGtoCAN[3] = 0xA6;  //PGN
+    AOGtoCAN[4] = 8;     //lenght
+    AOGtoCAN[5] = highByte(weightActual);
+    AOGtoCAN[6] = lowByte(weightActual);
+    AOGtoCAN[7] = actPos;  //1 to 8
+    // no AOGtoCAN[8] //9 to 16
+    AOGtoCAN[9] = setPos;  //1 to 8
+    // no AOGtoCAN[10] = 0; // 9 to 16
+    // no AOGtoCAN[11]
+    // no AOGtoCAN[12]
+    //do CRC
+    uint8_t crc = calculateCRC(AOGtoCAN, 13);
+    AOGtoCAN[13] = crc;
+    EncodeAOGtoCAN(AOGtoCAN, 14);
+    memset(AOGtoCAN, 0, 14);
+
     CanCheckOldArray();
   }  // end of 100 ms loop
 
   CanDecode();
   CheckDataFromCAN();
+
+  //This runs continuously, not timed //// RS485 Receive Data/Settings /////////////////
+  // if there's data available, read a packet
+
+  if (SerialRS485.available() > 0 && !isRS485HeaderFound) {
+    RS485temp = SerialRS485.read();
+    RS485header = RS485tempHeader << 8 | RS485temp;       //high,low bytes to make int
+    RS485tempHeader = RS485temp;                          //save for next time
+    if (RS485header == 32897) isRS485HeaderFound = true;  //Do we have a match?
+  }
+
+  if (isRS485HeaderFound && SerialRS485.available() >= 6) {
+    //We have all data, reset for next time
+    isRS485HeaderFound = false;
+
+    uint8_t id = SerialRS485.read();
+    uint8_t b1 = SerialRS485.read();
+    uint8_t b2 = SerialRS485.read();
+    uint8_t b3 = SerialRS485.read();
+    uint8_t b4 = SerialRS485.read();
+    uint8_t receivedCksum = SerialRS485.read();
+
+    // Verify Checksum
+    uint8_t calculatedCksum = id + b1 + b2 + b3 + b4;
+
+    if (calculatedCksum == receivedCksum) {
+      // Success! Rebuild the long
+      weightRaw = ((int32_t)b4 << 24) | ((int32_t)b3 << 16) | ((int32_t)b2 << 8) | b1;
+    }
+  }
+  /////////end of RS485 receiving//////////////////////
 }  // end of loop
 
 void CheckDataFromCAN() {
@@ -222,6 +325,20 @@ void CheckDataFromCAN() {
           if (engageFromHigh && heightPlanter < offThreshold) isPlanterLowered = true;  //enable the solenoid from the higher point
           else if (heightPlanter < onThreshold) isPlanterLowered = true;                //enable the solenoid from the lower point
           if (heightPlanter > offThreshold) isPlanterLowered = false;
+        }
+        if (dataPGN == 167)  //A7 fertilizer config
+        {
+          int16_t tempInt = 0;
+          tempInt = ((int16_t)globalBuffer[5] << 8) | (uint8_t)globalBuffer[6];
+          if (tempInt < 32000) {
+            settings.fertilizerZero = tempInt;
+            EEPROM.put(6, settings);
+          }
+          uint16_t temp = 0;
+          temp = ((uint16_t)globalBuffer[7] << 8) | (uint8_t)globalBuffer[8];
+          if (temp < 32000) SetfertilizerScale(temp);
+          temp = (uint8_t)globalBuffer[9];
+          if (temp > 0) ForceStectionOn(temp);
         }
       }
 
@@ -274,6 +391,16 @@ void SetSolenoids() {
   }
 }
 
+void ForceStectionOn(uint16_t temp) {
+  for (int j = 0; j < 8; j++) {
+    if (bitRead(temp, j)) {
+      solenoidActivationTimer[j] = solenoidActivationDelayTime;
+    }
+  }
+}
+
+void SetfertilizerScale(uint16_t temp) {
+}
 // Calculate CRC for PGN message
 uint8_t calculateCRC(uint8_t* buffer, uint8_t length) {
   uint8_t crc = 0;
