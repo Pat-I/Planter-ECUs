@@ -52,11 +52,11 @@ GND
 40 A16 (ECU pin 20) analog input3 not used
 39 A15 (ECU pin 21) analog input2 not used
 38 A14 (ECU pin 22) analog input1 not used
-37 (ECU pin 1) Pin12 output
-36 (ECU pin 1) Pin11 output
+37 (ECU pin 39) Pin12 output
+36 (ECU pin 38) Pin11 output
 35 (ECU pin 52 A) TX8 not used
 34 (ECU pin 24 B) RX8 not used
-33 (ECU pin 1) Pin10 output
+33 (ECU pin 37) Pin10 output
 */
 uint8_t clutch[] = { 3, 4, 5, 6, 7, 8, 9, 10, 2, 33, 36, 37, 18, 19, 22, 23 };
 

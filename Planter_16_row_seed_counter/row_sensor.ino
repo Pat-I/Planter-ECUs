@@ -34,7 +34,7 @@ void RetrieveRowData() {
           //we do not count the first gap after the seeder has been lowered
           rc_seedCount[i]++;
           // the spacing will overflow over 25.5km/h because of AOGSpeedX10
-          actualPlantSpacing = (sensorSeedDuration * (uint32_t)AOGSpeedX10) / 36;
+          actualPlantSpacing = ((sensorSeedDuration * (uint32_t)AOGSpeedX10) + 18) / 36;  // +18 is to compensate for trunducating
 
           //put the data in the array
           sensorAllGaps[i][putArrayIndex] = (uint16_t)actualPlantSpacing;

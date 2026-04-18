@@ -1,7 +1,7 @@
 
 
-char arduinoDate[] = "2026-04-10";
-char arduinoVersion[] = "v 1.0.8";
+char arduinoDate[] = "2026-04-17";
+char arduinoVersion[] = "v 1.0.9";
 
 //#define SERIAL_POP_COUNTER  //show the number of seed passed per row in the serial monitor,
 

@@ -19,10 +19,16 @@ void Summary() {
         avgSpacing[i] += sensorAllGaps[i][j];
       }
 
+      avgSpacing[i] += count/2;
       avgSpacing[i] /= count;
       float sing = 100.0f * (count - (Skips[i] + Doubles[i])) / count;
       singulation[i] = (uint8_t)sing;
-      if (avgSpacing[i] > 0) population[i] = 10000000000 / (avgSpacing[i] * rowWidth);
+      if (avgSpacing[i] > 0 && rowWidth > 0) {
+        uint64_t hectareMm2 = 10000000000ULL; 
+        uint32_t divisor = avgSpacing[i] * rowWidth;
+        // Adding divisor/2 to the top for perfect rounding
+        population[i] = (uint32_t)((hectareMm2 + (divisor / 2)) / divisor);
+      }
       avgSpacing[i] = min((uint16_t)avgSpacing[i], 255);
     }
   }

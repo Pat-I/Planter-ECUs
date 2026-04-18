@@ -1,16 +1,16 @@
 
 
-char arduinoDate[] = "2026-04-11";
+char arduinoDate[] = "2026-04-17";
 char firmwareName[] = "JD1770NT main machine ECU";
-char arduinoVersion[] = "v 1.0.7";
+char arduinoVersion[] = "v 1.0.8";
 /*
 Teensy Pinout
 GND
 0 (ECU pin 25-53 IN) RX1 SerialPop
 1 (ECU pin 26-54 OUT) TX1 SerialPop
-2 (ECU pin 36)Pin9 digital input from PWR circuit
-3 (ECU pin 1)Pin1 output
-4 (ECU pin 29)Pin2 output
+2 (ECU pin 36)Pin9 digital input from PWR circuit ----on/off signal from tank pressure (compressor)
+3 (ECU pin 1)Pin1 output ----downforce raise pressure
+4 (ECU pin 29)Pin2 output ----downforce lower pressure
 5 (ECU pin 30)Pin3 output
 6 (ECU pin 31)Pin4 output
 7 (ECU pin 32)Pin5 output
@@ -38,22 +38,22 @@ GND
 21
 20
 19 A5 (ECU pin 41) Pin14
-18 A4 (ECU pin 40) Pin13
+18 A4 (ECU pin 40) Pin13  ----fertilizer pressure (unused)
 17 (ECU pin 51 A) TX4 RS485-2 unused
 16 (ECU pin 23 B) RX4 RS485-2 unused
 15
 14
 13
 GND
-41 A17 (ECU pin 19) analog input4
-40 A16 (ECU pin 20) analog input3
-39 A15 (ECU pin 21) analog input2
-38 A14 (ECU pin 22) analog input1
-37 (ECU pin 1) Pin12 digital input from PWR circuit
-36 (ECU pin 1) Pin11 digital input from PWR circuit
+41 A17 (ECU pin 19) analog input4 ----vaccum2 (right)
+40 A16 (ECU pin 20) analog input3 ----vaccum1 (left)
+39 A15 (ECU pin 21) analog input2 ----downforce air pressure
+38 A14 (ECU pin 22) analog input1 ----Height sensor
+37 (ECU pin 39) Pin12 digital input from PWR circuit
+36 (ECU pin 38) Pin11 digital input from PWR circuit
 35 (ECU pin 52 A) TX8 RS485-1 downforce
 34 (ECU pin 24 B) RX8 RS485-1 downforce
-33 (ECU pin 1) Pin10 digital input from PWR circuit
+33 (ECU pin 37) Pin10 digital input from PWR circuit
 */
 
 /*  PWM Frequency -> 
@@ -124,23 +124,28 @@ uint8_t serialCRC = 0;
 
 //define inputs and outputs
 //outputs
-//#define PWM1_CYTRON 3
-//#define DIR1_CYTRON 4
+#define DOWNFORCE_RAISE 1
+#define DOWNFORCE_LOWER 29
 
 //digital inputs
-//#define BOUTON_UP 6
+#define COMPRESSOR 9
 //#define BOUTON_DOWN 7
 
 //analog inputs
 #define HEIGHT_SENSOR A14
-//#define POTO_UP A0
-//#define POTO_DOWN A1
+#define DOWNFORCE_SENSOR A15
+#define VACCUM1_SENSOR A16
+#define VACCUM2_SENSOR A17
 
 //input/output variables
 uint16_t heightRaw = 0;
 uint8_t heightPlanter;
 uint8_t onThreshold = 50;
 uint8_t offThreshold = 100;
+uint16_t vaccum1raw = 0;
+uint16_t vaccum2raw = 0;
+int32_t vaccum1 = 0;
+int32_t vaccum2 = 0;
 /////////////////////////////////////////////////////////////////////////////////////////////
 
 void setup() {
@@ -178,11 +183,13 @@ void setup() {
   pinMode(28, INPUT_PULLUP);    //digital2
   pinMode(11, INPUT_PULLUP);    //digital3
   pinMode(12, INPUT_PULLUP);    //digital4
+  pinMode(9, INPUT_PULLUP);     //digital input 1 on the power extension board
 
   //pinMode is only for digital pins?
   //pinMode(BOUTON_UP, INPUT);  //INSTEAD INPUT_PULLUP, not needed?
   //pinMode(BOUTON_DOWN, INPUT);
-  //pinMode(DIR1_CYTRON, OUTPUT);
+  pinMode(DOWNFORCE_RAISE, OUTPUT);
+  pinMode(DOWNFORCE_LOWER, OUTPUT);
 
   //EEPROM
   EEPROM.get(0, EEread);  // read identifier
@@ -213,17 +220,13 @@ void loop() {
     lastTime = currentTime;
 
     CanCheckOldArray();
-    //analogRead(BOUTON_UP);
-    //analogWrite(PWM1_CYTRON, 128);
+
     heightRaw = analogRead(HEIGHT_SENSOR);
     int32_t tempHeight = map(heightRaw, settings.heightDown, settings.heightUp, 1, 255);
     heightPlanter = constrain(tempHeight, 1, 255);
-    Serial.print(heightPlanter);
-    Serial.print(", ");
-    Serial.println(heightRaw);
-
-
-
+    //Serial.print(heightPlanter);
+    //Serial.print(", ");
+    //Serial.println(heightRaw);
 
     //Send the Height PGN
     AOGtoCAN[0] = 0x80;
@@ -245,6 +248,42 @@ void loop() {
     SerialPop.write(AOGtoCAN, 14);
     EncodeAOGtoCAN(AOGtoCAN, 14);
     memset(AOGtoCAN, 0, 14);
+
+    //Check the vaccum sensors
+    vaccum1raw = analogRead(VACCUM1_SENSOR);
+    vaccum1 = vaccum1raw - settings.vaccum1zero;
+    vaccum1 = (vaccum1 * (int32_t)settings.vaccum1multi + 5000) / 10000;  //+500 is for rounding, compensing truncading
+    vaccum1 += 5;
+    vaccum1 = constrain(vaccum1, 0, 255);
+
+    vaccum2raw = analogRead(VACCUM2_SENSOR);
+    vaccum2 = vaccum2raw - settings.vaccum2zero;
+    vaccum2 = (vaccum2 * (int32_t)settings.vaccum2multi + 5000) / 10000;  //+500 is for rounding, compensing truncading
+    vaccum2 += 5;
+    vaccum2 = constrain(vaccum2, 0, 255);
+
+    //Send the Vaccum PGN
+    AOGtoCAN[0] = 0x80;
+    AOGtoCAN[1] = 0x81;
+    AOGtoCAN[2] = 0x7B;  //Source
+    AOGtoCAN[3] = 0xA2;  //PGN
+    AOGtoCAN[4] = 8;     //lenght
+    AOGtoCAN[5] = highByte(vaccum1raw);
+    AOGtoCAN[6] = lowByte(vaccum1raw);
+    AOGtoCAN[7] = highByte(vaccum2raw);
+    AOGtoCAN[8] = lowByte(vaccum2raw);
+    AOGtoCAN[9] = vaccum1;
+    AOGtoCAN[10] = vaccum2;
+    // no AOGtoCAN[11]
+    // no AOGtoCAN[12]
+    //do CRC
+    crc = calculateCRC(AOGtoCAN, 13);
+    AOGtoCAN[13] = crc;
+    SerialPop.write(AOGtoCAN, 14);
+    EncodeAOGtoCAN(AOGtoCAN, 14);
+    memset(AOGtoCAN, 0, 14);
+
+
 
   }  // end of 100 ms loop
 
@@ -318,19 +357,43 @@ void CheckDataFromCAN() {
           SerialPop.write(globalBuffer, 6 + dataLen);
         }
         //other here
-        if (dataSrc == 123 && dataPGN == 161) {
-          //7B A1 height config
-          uint16_t temp = 0;
-          temp = ((uint16_t)globalBuffer[5] << 8) | (uint8_t)globalBuffer[6];
-          if (temp < 4096) settings.heightDown = temp;
-          temp = ((uint16_t)globalBuffer[7] << 8) | (uint8_t)globalBuffer[8];
-          if (temp < 4096) settings.heightUp = temp;
-          temp = (uint8_t)globalBuffer[9];
-          if (temp < 255) settings.OnThreshold = temp;
-          temp = (uint8_t)globalBuffer[10];
-          if (temp < 255) settings.OffThreshold = temp;
+        if (dataSrc == 123) {
+          if (dataPGN == 161) {
+            //7B A1 height config
+            uint16_t temp = 0;
+            temp = ((uint16_t)globalBuffer[5] << 8) | (uint8_t)globalBuffer[6];
+            if (temp < 4096) settings.heightDown = temp;
+            temp = ((uint16_t)globalBuffer[7] << 8) | (uint8_t)globalBuffer[8];
+            if (temp < 4096) settings.heightUp = temp;
+            temp = (uint8_t)globalBuffer[9];
+            if (temp < 255) settings.OnThreshold = temp;
+            temp = (uint8_t)globalBuffer[10];
+            if (temp < 255) settings.OffThreshold = temp;
 
-          EEPROM.put(6, settings);
+            EEPROM.put(6, settings);
+          }
+          if (dataPGN == 163) {
+            //7B A3 vaccum config
+            uint32_t temp = 0;
+            temp = ((uint16_t)globalBuffer[5] << 8) | (uint8_t)globalBuffer[6];
+            if (temp < 4096) settings.vaccum1zero = temp;
+            temp = ((uint16_t)globalBuffer[7] << 8) | (uint8_t)globalBuffer[8];
+            if (temp < 4096) settings.vaccum2zero = temp;
+            temp = (uint8_t)globalBuffer[9];
+            if (temp < 255 && temp > 0) {
+              // temp to the factor
+              int32_t divider = vaccum1raw - settings.vaccum1zero;
+              if (divider != 0) settings.vaccum1multi = (10000L * temp - 5000L) / divider;
+            }
+            temp = (uint8_t)globalBuffer[10];
+            if (temp < 255 && temp > 0) {
+              // temp to the factor
+              int32_t divider = vaccum2raw - settings.vaccum2zero;
+              if (divider != 0) settings.vaccum2multi = (10000L * temp - 5000L) / divider;
+            }
+
+            EEPROM.put(6, settings);
+          }
         }
       }
     }

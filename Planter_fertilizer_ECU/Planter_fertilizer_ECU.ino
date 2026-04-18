@@ -10,8 +10,8 @@ uint8_t solenoidActivationDelayTime = 50;  // time the solenoids will not be pow
 /*
 Teensy Pinout
 GND
-0 (ECU pin 25-53 IN) not used
-1 (ECU pin 26-54 OUT) not used
+0 (ECU pin 25-53 IN) RX1 not used
+1 (ECU pin 26-54 OUT) TX1 not used
 2 (ECU pin 36)Pin9 input
 3 (ECU pin 1)Pin1 output
 4 (ECU pin 29)Pin2 output
@@ -53,11 +53,11 @@ GND
 40 A16 (ECU pin 20) analog input3 not used
 39 A15 (ECU pin 21) analog input2 not used
 38 A14 (ECU pin 22) analog input1 not used
-37 (ECU pin 1) Pin12 input
-36 (ECU pin 1) Pin11 input
+37 (ECU pin 39) Pin12 input
+36 (ECU pin 38) Pin11 input
 35 (ECU pin 52 A) TX8 RS485 fertilizer
 34 (ECU pin 24 B) RX8 Rs485 fertilizer
-33 (ECU pin 1) Pin10 input
+33 (ECU pin 37) Pin10 input
 */
 uint8_t solenoid[] = { 3, 4, 5, 6, 7, 8, 9, 10 };
 uint8_t hall[] = { 2, 33, 36, 37, 18, 19, 22, 23 };
