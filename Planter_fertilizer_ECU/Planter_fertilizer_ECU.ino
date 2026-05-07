@@ -1,8 +1,8 @@
 
 
-char arduinoDate[] = "2026-04-15";
+char arduinoDate[] = "2026-05-06";
 char firmwareName[] = "JD1770NT fertilizer ECU";
-char arduinoVersion[] = "v 1.0.0";
+char arduinoVersion[] = "v 1.0.1";
 
 bool engageFromHigh = true;
 uint8_t stopTime = 100;                    // time the solenoids remain powered if stopped, secX10, 100 is 10 sec, max 200(20sec)
@@ -72,12 +72,13 @@ uint8_t forceOnTime[8];
 
 //EEPROM
 #include <EEPROM.h>
-#define EEP_Ident 0x5422
+#define EEP_Ident 0x5425
 int16_t EEread = 0;
 struct __attribute__((packed)) Storage {
-  int16_t fertilizerZero = 55;
+  int32_t fertilizerZero = 35190;
+  int32_t weightFactor = -1000;
 };
-Storage settings;  //30 bytes
+Storage settings;  //6 bytes
 
 //Used to set CPU speed
 extern "C" uint32_t set_arm_clock(uint32_t frequency);
@@ -215,18 +216,27 @@ void loop() {
     }
 
     //send the fertilizer PGN 7B A6
+    //calculate the weight
+    //weightActual = (int16_t)(((int64_t)weightRaw * settings.weightFactor) >> 16) - settings.fertilizerZero;
+    int64_t temp = weightRaw - settings.fertilizerZero;
+    weightActual = (int16_t)((temp * settings.weightFactor) >> 20);
+
     //check trap position, reading HIGH is trap closed, LOW is trap open
     for (uint8_t i = 0; i < numSolenoid; i++) {
       isTrapOpen[i] = !digitalRead(hall[i]);
     }
     uint8_t setPos = 0;
     uint8_t actPos = 0;
+    uint8_t forcePos = 0;
     for (int i = 0; i < 8; i++) {
       if (!isSolenoidActive[i]) {
         setPos |= (1 << i);  // Set the bit at position 'i' to 1
       }
       if (isTrapOpen[i]) {
         actPos |= (1 << i);  // Set the bit at position 'i' to 1
+      }
+      if(solenoidActivationTimer[i] > 1){
+        forcePos |= (1 << i);  // Set the bit at position 'i' to 1
       }
     }
     AOGtoCAN[0] = 0x80;
@@ -240,8 +250,8 @@ void loop() {
     // no AOGtoCAN[8] //9 to 16
     AOGtoCAN[9] = setPos;  //1 to 8
     // no AOGtoCAN[10] = 0; // 9 to 16
-    // no AOGtoCAN[11]
-    // no AOGtoCAN[12]
+    AOGtoCAN[11] = forcePos; // 1to 8
+    // no AOGtoCAN[12] //9 to 16
     //do CRC
     uint8_t crc = calculateCRC(AOGtoCAN, 13);
     AOGtoCAN[13] = crc;
@@ -249,6 +259,7 @@ void loop() {
     memset(AOGtoCAN, 0, 14);
 
     CanCheckOldArray();
+
   }  // end of 100 ms loop
 
   CanDecode();
@@ -330,8 +341,10 @@ void CheckDataFromCAN() {
         {
           int16_t tempInt = 0;
           tempInt = ((int16_t)globalBuffer[5] << 8) | (uint8_t)globalBuffer[6];
-          if (tempInt < 32000) {
-            settings.fertilizerZero = tempInt;
+          if (tempInt < 32000 && settings.weightFactor != 0) {
+            //the kg we should 0
+            int32_t rawError = (int32_t)(((int64_t)tempInt << 20) / settings.weightFactor);
+            settings.fertilizerZero += rawError;
             EEPROM.put(6, settings);
           }
           uint16_t temp = 0;
@@ -400,6 +413,15 @@ void ForceStectionOn(uint16_t temp) {
 }
 
 void SetfertilizerScale(uint16_t temp) {
+  if (weightActual != 0) {  // Éviter la division par zéro
+    // On utilise int64_t pour éviter tout dépassement pendant la multiplication
+    int64_t newFactor = ((int64_t)settings.weightFactor * temp) / weightActual;
+
+    settings.weightFactor = (int32_t)newFactor;
+
+    // Sauvegarder le nouveau réglage
+    EEPROM.put(6, settings);
+  }
 }
 // Calculate CRC for PGN message
 uint8_t calculateCRC(uint8_t* buffer, uint8_t length) {

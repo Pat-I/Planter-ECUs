@@ -1,8 +1,8 @@
 
 
-char arduinoDate[] = "2026-04-16";
+char arduinoDate[] = "2026-05-05";
 char firmwareName[] = "HX711 cell Nano for JD1770";
-char arduinoVersion[] = "v 1.0.0";
+char arduinoVersion[] = "v 1.0.1";
 
 /*  PWM Frequency -> 
    *   490hz (default) = 0
@@ -10,9 +10,11 @@ char arduinoVersion[] = "v 1.0.0";
    *   3921hz = 2
    */
 #define PWM_Frequency 0
-
+#include <SoftwareSerial.h>
 #include "HX711.h"
 
+// Définition des broches : RX (6) et TX (7)
+SoftwareSerial SerialRS485(6, 7);
 HX711 scale1;
 
 uint8_t dataPin1 = 4;
@@ -55,7 +57,8 @@ void setup() {
     TCCR1B = TCCR1B & B11111000 | B00000010;  // set timer 1 to 8 for PWM frequency of  3921.16 Hz
     TCCR2B = TCCR2B & B11111000 | B00000010;  // set timer 2 to 8 for PWM frequency of  3921.16 Hx
   }
-  Serial.begin(9600);
+  SerialRS485.begin(9600);
+  Serial.begin(115200);
   //pinMode is only for digital pins?
   //pinMode(BOUTON_UP,  INPUT); //INSTEAD INPUT_PULLUP, not needed?
   //pinMode(BOUTON_DOWN, INPUT);
@@ -64,6 +67,9 @@ void setup() {
   delay(100);
 
   scale1.begin(dataPin1, clockPin1);
+  Serial.println(arduinoDate);
+  Serial.println(firmwareName);
+  Serial.println(arduinoVersion);
 }
 
 void loop() {
@@ -118,7 +124,7 @@ void sendPacket(uint8_t sensorID, int32_t weight) {
   buf[7] = cksum;
 
   //digitalWrite(RS485_EN, HIGH);
-  Serial.write(buf, 8);
-  Serial.flush();
+  SerialRS485.write(buf, 8);
+  SerialRS485.flush();
   //digitalWrite(RS485_EN, LOW);
 }
