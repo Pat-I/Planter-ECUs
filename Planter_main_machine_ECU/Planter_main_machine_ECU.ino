@@ -1,8 +1,8 @@
 
 
-char arduinoDate[] = "2026-04-17";
+char arduinoDate[] = "2026-05-08";
 char firmwareName[] = "JD1770NT main machine ECU";
-char arduinoVersion[] = "v 1.0.8";
+char arduinoVersion[] = "v 1.0.9";
 /*
 Teensy Pinout
 GND
@@ -74,7 +74,7 @@ uint32_t currentTime = LOOP_TIME;
 
 //EEPROM
 #include <EEPROM.h>
-#define EEP_Ident 0x5422
+#define EEP_Ident 0x5424
 int16_t EEread = 0;
 struct __attribute__((packed)) Storage {
   uint16_t heightDown = 55;
@@ -85,16 +85,16 @@ struct __attribute__((packed)) Storage {
   uint16_t vaccum2zero = 55;
   int16_t vaccum1multi = 1000;
   int16_t vaccum2multi = 1000;
-  uint16_t downforce1zero = 55;
-  int16_t downforce1multi = 1000;
-  uint16_t downforce2zero = 55;
-  int16_t downforce2multi = 1000;
-  uint16_t downforce3zero = 55;
-  int16_t downforce3multi = 1000;
-  uint16_t downPressureZero = 55;
-  int16_t downPressureMulti = 1000;
+  uint32_t downforce1zero = 55;
+  int32_t downforce1multi = 1000;
+  uint32_t downforce2zero = 55;
+  int32_t downforce2multi = 1000;
+  uint32_t downforce3zero = 55;
+  int32_t downforce3multi = 1000;
+  uint16_t airPressureZero = 55;
+  int16_t airPressureMulti = 1000;
 };
-Storage settings;  //30 bytes
+Storage settings;  //46 bytes
 
 //communication
 uint8_t CANreceiveBuffer[16][288];
@@ -140,12 +140,20 @@ uint8_t serialCRC = 0;
 //input/output variables
 uint16_t heightRaw = 0;
 uint8_t heightPlanter;
-uint8_t onThreshold = 50;
-uint8_t offThreshold = 100;
 uint16_t vaccum1raw = 0;
 uint16_t vaccum2raw = 0;
 int32_t vaccum1 = 0;
 int32_t vaccum2 = 0;
+
+int32_t downforce1Raw = 0;
+int32_t downforce1Actual = 0;
+int32_t downforce2Raw = 0;
+int32_t downforce2Actual = 0;
+int32_t downforce3Raw = 0;
+int32_t downforce3Actual = 0;
+
+uint16_t airPressureRaw = 0;
+uint32_t airPressurePSI = 0;
 /////////////////////////////////////////////////////////////////////////////////////////////
 
 void setup() {
@@ -224,9 +232,6 @@ void loop() {
     heightRaw = analogRead(HEIGHT_SENSOR);
     int32_t tempHeight = map(heightRaw, settings.heightDown, settings.heightUp, 1, 255);
     heightPlanter = constrain(tempHeight, 1, 255);
-    //Serial.print(heightPlanter);
-    //Serial.print(", ");
-    //Serial.println(heightRaw);
 
     //Send the Height PGN
     AOGtoCAN[0] = 0x80;
@@ -238,8 +243,8 @@ void loop() {
     AOGtoCAN[6] = lowByte(heightRaw);
     AOGtoCAN[7] = heightPlanter;
     // no AOGtoCAN[8]
-    AOGtoCAN[9] = onThreshold;
-    AOGtoCAN[10] = offThreshold;
+    AOGtoCAN[9] = settings.OnThreshold;
+    AOGtoCAN[10] = settings.OffThreshold;
     // no AOGtoCAN[11]
     // no AOGtoCAN[12]
     //do CRC
@@ -283,7 +288,44 @@ void loop() {
     EncodeAOGtoCAN(AOGtoCAN, 14);
     memset(AOGtoCAN, 0, 14);
 
+    //send the downforce PGN
+    int64_t tempDownforce = downforce1Raw - settings.downforce1zero;
+    downforce1Actual = (int16_t)((tempDownforce * settings.downforce1multi) >> 20);
+    tempDownforce = downforce2Raw - settings.downforce2zero;
+    downforce2Actual = (int16_t)((tempDownforce * settings.downforce2multi) >> 20);
+    tempDownforce = downforce3Raw - settings.downforce3zero;
+    downforce3Actual = (int16_t)((tempDownforce * settings.downforce3multi) >> 20);
 
+    //Check the air pressure sensor
+    airPressureRaw = analogRead(DOWNFORCE_SENSOR);
+    airPressurePSI = airPressureRaw - settings.airPressureZero;
+    airPressurePSI = (airPressurePSI * (int32_t)settings.airPressureMulti + 5000) / 10000;  //+500 is for rounding, compensing truncading
+    airPressurePSI += 5;
+    airPressurePSI = constrain(airPressurePSI, 0, 255);
+
+    //Send the Downforce PGN
+    AOGtoCAN[0] = 0x80;
+    AOGtoCAN[1] = 0x81;
+    AOGtoCAN[2] = 0x7B;  //Source
+    AOGtoCAN[3] = 0xA4;  //PGN
+    AOGtoCAN[4] = 8;     //lenght
+    tempDownforce = downforce1Actual + 5;
+    AOGtoCAN[5] = constrain(tempDownforce, 0, 255);
+    tempDownforce = downforce2Actual + 5;
+    AOGtoCAN[6] = constrain(tempDownforce, 0, 255);
+    tempDownforce = downforce3Actual + 5;
+    AOGtoCAN[7] = constrain(tempDownforce, 0, 255);
+    AOGtoCAN[8] = 0;
+    AOGtoCAN[9] = highByte(airPressureRaw);
+    AOGtoCAN[10] = lowByte(airPressureRaw);
+    AOGtoCAN[11] = airPressurePSI;
+    // no AOGtoCAN[12] yet----------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //do CRC
+    crc = calculateCRC(AOGtoCAN, 13);
+    AOGtoCAN[13] = crc;
+    SerialPop.write(AOGtoCAN, 14);
+    EncodeAOGtoCAN(AOGtoCAN, 14);
+    memset(AOGtoCAN, 0, 14);
 
   }  // end of 100 ms loop
 
@@ -366,9 +408,9 @@ void CheckDataFromCAN() {
             temp = ((uint16_t)globalBuffer[7] << 8) | (uint8_t)globalBuffer[8];
             if (temp < 4096) settings.heightUp = temp;
             temp = (uint8_t)globalBuffer[9];
-            if (temp < 255) settings.OnThreshold = temp;
+            if (temp < 255 && temp < settings.OffThreshold) settings.OnThreshold = temp;
             temp = (uint8_t)globalBuffer[10];
-            if (temp < 255) settings.OffThreshold = temp;
+            if (temp < 255 && temp > settings.OnThreshold) settings.OffThreshold = temp;
 
             EEPROM.put(6, settings);
           }
@@ -394,12 +436,79 @@ void CheckDataFromCAN() {
 
             EEPROM.put(6, settings);
           }
+          if (dataPGN == 165) {
+            //downpressure config
+            if (globalBuffer[8] == 16) {
+              //00010000
+              if (downforce1Actual != 0) {  // Éviter la division par zéro
+                // On utilise int64_t pour éviter tout dépassement pendant la multiplication
+                int64_t newFactor = ((int64_t)settings.downforce1multi * globalBuffer[5]) / downforce1Actual;
+
+                settings.downforce1multi = (int32_t)newFactor;
+              }
+            }
+            if (globalBuffer[8] == 32) {
+              //00100000
+              if (downforce2Actual != 0) {  // Éviter la division par zéro
+                // On utilise int64_t pour éviter tout dépassement pendant la multiplication
+                int64_t newFactor = ((int64_t)settings.downforce2multi * globalBuffer[5]) / downforce2Actual;
+
+                settings.downforce2multi = (int32_t)newFactor;
+              }
+            }
+            if (globalBuffer[8] == 64) {
+              //01000000
+              if (downforce3Actual != 0) {  // Éviter la division par zéro
+                // On utilise int64_t pour éviter tout dépassement pendant la multiplication
+                int64_t newFactor = ((int64_t)settings.downforce3multi * globalBuffer[5]) / downforce3Actual;
+
+                settings.downforce3multi = (int32_t)newFactor;
+              }
+            }
+            if (globalBuffer[8] == 1) {
+              //zero the cell
+              if (settings.downforce1multi != 0) {
+                //the kg we should 0
+                int32_t rawError = (int32_t)(((int64_t)downforce1Actual << 20) / settings.downforce1multi);
+                settings.downforce1zero += rawError;
+              }
+            }
+            if (globalBuffer[8] == 2) {
+              //zero the cell
+              if (settings.downforce2multi != 0) {
+                //the kg we should 0
+                int32_t rawError = (int32_t)(((int64_t)downforce2Actual << 20) / settings.downforce2multi);
+                settings.downforce2zero += rawError;
+              }
+            }
+            if (globalBuffer[8] == 4) {
+              //zero the cell
+              if (settings.downforce3multi != 0) {
+                //the kg we should 0
+                int32_t rawError = (int32_t)(((int64_t)downforce3Actual << 20) / settings.downforce3multi);
+                settings.downforce3zero += rawError;
+              }
+            }
+            //air pressure zero
+            uint32_t temp = 0;
+            temp = ((uint16_t)globalBuffer[9] << 8) | (uint8_t)globalBuffer[10];
+            if (temp < 4096) settings.airPressureZero = temp;
+            //air pressure scale
+            temp = (uint8_t)globalBuffer[11];
+            if (temp < 255 && temp > 0) {
+              // temp to the factor
+              int32_t divider = airPressureRaw - settings.airPressureZero;
+              if (divider != 0) settings.airPressureMulti = (10000L * temp - 5000L) / divider;
+            }
+
+            //read the status byte---------------------------------------------------------------------------------------------------------------------------------------------------------
+            EEPROM.put(6, settings);
+          }
         }
       }
     }
   }
 }
-
 // Calculate CRC for PGN message
 uint8_t calculateCRC(uint8_t* buffer, uint8_t length) {
   uint8_t crc = 0;

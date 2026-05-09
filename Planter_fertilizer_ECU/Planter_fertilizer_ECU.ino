@@ -217,7 +217,6 @@ void loop() {
 
     //send the fertilizer PGN 7B A6
     //calculate the weight
-    //weightActual = (int16_t)(((int64_t)weightRaw * settings.weightFactor) >> 16) - settings.fertilizerZero;
     int64_t temp = weightRaw - settings.fertilizerZero;
     weightActual = (int16_t)((temp * settings.weightFactor) >> 20);
 
