@@ -1,8 +1,8 @@
 
 
-char arduinoDate[] = "2026-05-09";
+char arduinoDate[] = "2026-05-10";
 char firmwareName[] = "JD1770NT main machine ECU";
-char arduinoVersion[] = "v 1.0.10";
+char arduinoVersion[] = "v 1.0.11";
 /*
 Teensy Pinout
 GND
@@ -72,6 +72,7 @@ const uint8_t LOOP_TIME = 100;  // 10Hz
 uint32_t lastTime = LOOP_TIME;
 uint32_t currentTime = LOOP_TIME;
 uint8_t millisSectionStatus = 0;
+uint8_t counter2Hz = 0;
 
 //EEPROM
 #include <EEPROM.h>
@@ -253,6 +254,7 @@ void loop() {
   if (currentTime - lastTime >= LOOP_TIME) {
     lastTime = currentTime;
     millisSectionStatus++;
+    counter2Hz++;
 
     // check if a field is connected
     if (millisSectionStatus > 120) {
@@ -260,6 +262,10 @@ void loop() {
 
       digitalWrite(DOWNFORCE_LOWER, LOW);
       digitalWrite(DOWNFORCE_RAISE, LOW);
+    }
+
+    if (counter2Hz >= 5) {
+      counter2Hz = 0;
     }
 
     CanCheckOldArray();
@@ -271,7 +277,7 @@ void loop() {
     buf[1] = 0x81;
     buf[2] = 0x82;
     buf[3] = cellNumber;
-    if(cellNumber >= 3) cellNumber = 0;
+    if (cellNumber >= 3) cellNumber = 0;
 
     //digitalWrite(RS485_EN, HIGH);
     SerialRS485.write(buf, 4);
@@ -282,26 +288,28 @@ void loop() {
     int32_t tempHeight = map(heightRaw, settings.heightDown, settings.heightUp, 1, 255);
     heightPlanter = constrain(tempHeight, 1, 255);
 
-    //Send the Height PGN
-    AOGtoCAN[0] = 0x80;
-    AOGtoCAN[1] = 0x81;
-    AOGtoCAN[2] = 0x7B;  //Source
-    AOGtoCAN[3] = 0xA0;  //PGN
-    AOGtoCAN[4] = 8;     //lenght
-    AOGtoCAN[5] = highByte(heightRaw);
-    AOGtoCAN[6] = lowByte(heightRaw);
-    AOGtoCAN[7] = heightPlanter;
-    // no AOGtoCAN[8]
-    AOGtoCAN[9] = settings.OnThreshold;
-    AOGtoCAN[10] = settings.OffThreshold;
-    // no AOGtoCAN[11]
-    // no AOGtoCAN[12]
-    //do CRC
-    uint8_t crc = calculateCRC(AOGtoCAN, 13);
-    AOGtoCAN[13] = crc;
-    SerialPop.write(AOGtoCAN, 14);
-    EncodeAOGtoCAN(AOGtoCAN, 14);
-    memset(AOGtoCAN, 0, 14);
+    if (counter2Hz == 1) {
+      //Send the Height PGN
+      AOGtoCAN[0] = 0x80;
+      AOGtoCAN[1] = 0x81;
+      AOGtoCAN[2] = 0x7B;  //Source
+      AOGtoCAN[3] = 0xA0;  //PGN
+      AOGtoCAN[4] = 8;     //lenght
+      AOGtoCAN[5] = highByte(heightRaw);
+      AOGtoCAN[6] = lowByte(heightRaw);
+      AOGtoCAN[7] = heightPlanter;
+      // no AOGtoCAN[8]
+      AOGtoCAN[9] = settings.OnThreshold;
+      AOGtoCAN[10] = settings.OffThreshold;
+      // no AOGtoCAN[11]
+      // no AOGtoCAN[12]
+      //do CRC
+      uint8_t crc = calculateCRC(AOGtoCAN, 13);
+      AOGtoCAN[13] = crc;
+      SerialPop.write(AOGtoCAN, 14);
+      EncodeAOGtoCAN(AOGtoCAN, 14);
+      memset(AOGtoCAN, 0, 14);
+    }
 
     //Check the vaccum sensors
     vaccum1raw = analogRead(VACCUM1_SENSOR);
@@ -316,28 +324,30 @@ void loop() {
     vaccum2 += 5;
     vaccum2 = constrain(vaccum2, 0, 255);
 
-    //Send the Vaccum PGN
-    AOGtoCAN[0] = 0x80;
-    AOGtoCAN[1] = 0x81;
-    AOGtoCAN[2] = 0x7B;  //Source
-    AOGtoCAN[3] = 0xA2;  //PGN
-    AOGtoCAN[4] = 8;     //lenght
-    AOGtoCAN[5] = highByte(vaccum1raw);
-    AOGtoCAN[6] = lowByte(vaccum1raw);
-    AOGtoCAN[7] = highByte(vaccum2raw);
-    AOGtoCAN[8] = lowByte(vaccum2raw);
-    AOGtoCAN[9] = vaccum1;
-    AOGtoCAN[10] = vaccum2;
-    // no AOGtoCAN[11]
-    // no AOGtoCAN[12]
-    //do CRC
-    crc = calculateCRC(AOGtoCAN, 13);
-    AOGtoCAN[13] = crc;
-    SerialPop.write(AOGtoCAN, 14);
-    EncodeAOGtoCAN(AOGtoCAN, 14);
-    memset(AOGtoCAN, 0, 14);
+    if (counter2Hz == 2) {
+      //Send the Vaccum PGN
+      AOGtoCAN[0] = 0x80;
+      AOGtoCAN[1] = 0x81;
+      AOGtoCAN[2] = 0x7B;  //Source
+      AOGtoCAN[3] = 0xA2;  //PGN
+      AOGtoCAN[4] = 8;     //lenght
+      AOGtoCAN[5] = highByte(vaccum1raw);
+      AOGtoCAN[6] = lowByte(vaccum1raw);
+      AOGtoCAN[7] = highByte(vaccum2raw);
+      AOGtoCAN[8] = lowByte(vaccum2raw);
+      AOGtoCAN[9] = vaccum1;
+      AOGtoCAN[10] = vaccum2;
+      // no AOGtoCAN[11]
+      // no AOGtoCAN[12]
+      //do CRC
+      uint8_t crc = calculateCRC(AOGtoCAN, 13);
+      AOGtoCAN[13] = crc;
+      SerialPop.write(AOGtoCAN, 14);
+      EncodeAOGtoCAN(AOGtoCAN, 14);
+      memset(AOGtoCAN, 0, 14);
+    }
 
-    //send the downforce PGN
+    //Check the downforce
     int64_t tempDownforce = downforce1Raw - settings.downforce1zero;
     downforce1Actual = (int16_t)((tempDownforce * settings.downforce1multi) >> 20);
     tempDownforce = downforce2Raw - settings.downforce2zero;
@@ -353,32 +363,33 @@ void loop() {
     airPressurePSI = constrain(airPressurePSI, 0, 255);
 
     //Send the Downforce PGN
-    AOGtoCAN[0] = 0x80;
-    AOGtoCAN[1] = 0x81;
-    AOGtoCAN[2] = 0x7B;  //Source
-    AOGtoCAN[3] = 0xA4;  //PGN
-    AOGtoCAN[4] = 8;     //lenght
-    tempDownforce = downforce1Actual + 5;
-    AOGtoCAN[5] = constrain(tempDownforce, 0, 255);
-    tempDownforce = downforce2Actual + 5;
-    AOGtoCAN[6] = constrain(tempDownforce, 0, 255);
-    tempDownforce = downforce3Actual + 5;
-    AOGtoCAN[7] = constrain(tempDownforce, 0, 255);
-    AOGtoCAN[8] = 0;
-    AOGtoCAN[9] = highByte(airPressureRaw);
-    AOGtoCAN[10] = lowByte(airPressureRaw);
-    AOGtoCAN[11] = airPressurePSI;
-    uint8_t feedbackByte = 0;
-    if (digitalRead(DOWNFORCE_RAISE) == HIGH) feedbackByte |= (1 << 0);  // Bit 0
-    if (digitalRead(DOWNFORCE_LOWER) == HIGH) feedbackByte |= (1 << 1);  // Bit 1
-    AOGtoCAN[12] = feedbackByte;
-    //do CRC
-    crc = calculateCRC(AOGtoCAN, 13);
-    AOGtoCAN[13] = crc;
-    SerialPop.write(AOGtoCAN, 14);
-    EncodeAOGtoCAN(AOGtoCAN, 14);
-    memset(AOGtoCAN, 0, 14);
-
+    if (counter2Hz == 3) {
+      AOGtoCAN[0] = 0x80;
+      AOGtoCAN[1] = 0x81;
+      AOGtoCAN[2] = 0x7B;  //Source
+      AOGtoCAN[3] = 0xA4;  //PGN
+      AOGtoCAN[4] = 8;     //lenght
+      tempDownforce = downforce1Actual + 5;
+      AOGtoCAN[5] = constrain(tempDownforce, 0, 255);
+      tempDownforce = downforce2Actual + 5;
+      AOGtoCAN[6] = constrain(tempDownforce, 0, 255);
+      tempDownforce = downforce3Actual + 5;
+      AOGtoCAN[7] = constrain(tempDownforce, 0, 255);
+      AOGtoCAN[8] = 0;
+      AOGtoCAN[9] = highByte(airPressureRaw);
+      AOGtoCAN[10] = lowByte(airPressureRaw);
+      AOGtoCAN[11] = airPressurePSI;
+      uint8_t feedbackByte = 0;
+      if (digitalRead(DOWNFORCE_RAISE) == HIGH) feedbackByte |= (1 << 0);  // Bit 0
+      if (digitalRead(DOWNFORCE_LOWER) == HIGH) feedbackByte |= (1 << 1);  // Bit 1
+      AOGtoCAN[12] = feedbackByte;
+      //do CRC
+      uint8_t crc = calculateCRC(AOGtoCAN, 13);
+      AOGtoCAN[13] = crc;
+      SerialPop.write(AOGtoCAN, 14);
+      EncodeAOGtoCAN(AOGtoCAN, 14);
+      memset(AOGtoCAN, 0, 14);
+    }
   }  // end of 100 ms loop
 
 
