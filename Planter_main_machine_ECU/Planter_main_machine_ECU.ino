@@ -1,8 +1,8 @@
 
 
-char arduinoDate[] = "2026-05-08";
+char arduinoDate[] = "2026-05-09";
 char firmwareName[] = "JD1770NT main machine ECU";
-char arduinoVersion[] = "v 1.0.9";
+char arduinoVersion[] = "v 1.0.10";
 /*
 Teensy Pinout
 GND
@@ -120,6 +120,19 @@ uint8_t serialPgn = 0;
 uint8_t serialLength = 0;
 uint8_t serialData[256];  //just to be sure it's long enough
 uint8_t serialCRC = 0;
+
+///////for Weight serial reading/////////////////////////////////////////////////////////
+#define SerialRS485 Serial8
+uint8_t rs485RxBuffer[2048];
+uint8_t rs485TxBuffer[2048];
+uint32_t bautRS485 = 9600;
+//Parsing PGN
+bool isRS485HeaderFound = false;
+uint16_t RS485tempHeader = 0;
+uint16_t RS485header = 0;
+uint16_t RS485temp = 0;
+
+uint8_t cellNumber = 0;
 ////////////////////////////////////////////////////////////////////////////////////////////
 
 
@@ -156,7 +169,7 @@ int32_t downforce3Actual = 0;
 uint8_t ReceiveddownforceStatus = 0;
 
 uint16_t airPressureRaw = 0;
-uint32_t airPressurePSI = 0;
+int32_t airPressurePSI = 0;
 /////////////////////////////////////////////////////////////////////////////////////////////
 
 void setup() {
@@ -183,6 +196,10 @@ void setup() {
   SerialPop.addMemoryForRead(popRxBuffer, sizeof(popRxBuffer));
   SerialPop.addMemoryForWrite(popTxBuffer, sizeof(popTxBuffer));
 
+  SerialRS485.begin(bautRS485);
+  SerialRS485.addMemoryForRead(rs485RxBuffer, sizeof(rs485RxBuffer));
+  SerialRS485.addMemoryForWrite(rs485TxBuffer, sizeof(rs485TxBuffer));
+
   analogReadResolution(12);  //read 0-4095 on analog pins
   analogReadAveraging(8);    //takes 15us
   //set the inputs independantly from the pin names
@@ -207,7 +224,6 @@ void setup() {
   pinMode(8, OUTPUT);
   pinMode(9, OUTPUT);
   pinMode(10, OUTPUT);
-
 
   //EEPROM
   EEPROM.get(0, EEread);  // read identifier
@@ -247,6 +263,20 @@ void loop() {
     }
 
     CanCheckOldArray();
+
+    //Send order to receive downpressure
+    cellNumber++;
+    uint8_t buf[4];
+    buf[0] = 0x80;
+    buf[1] = 0x81;
+    buf[2] = 0x82;
+    buf[3] = cellNumber;
+    if(cellNumber >= 3) cellNumber = 0;
+
+    //digitalWrite(RS485_EN, HIGH);
+    SerialRS485.write(buf, 4);
+    SerialRS485.flush();
+    //digitalWrite(RS485_EN, LOW);
 
     heightRaw = analogRead(HEIGHT_SENSOR);
     int32_t tempHeight = map(heightRaw, settings.heightDown, settings.heightUp, 1, 255);
@@ -392,6 +422,38 @@ void loop() {
     memset(AOGtoCAN, 0, serialLength + 6);
   }
   /////////end of serial to CAN//////////////////////
+  //This runs continuously, not timed //// RS485 Receive Data/Settings /////////////////
+  // if there's data available, read a packet
+
+  if (SerialRS485.available() > 0 && !isRS485HeaderFound) {
+    RS485temp = SerialRS485.read();
+    RS485header = RS485tempHeader << 8 | RS485temp;       //high,low bytes to make int
+    RS485tempHeader = RS485temp;                          //save for next time
+    if (RS485header == 32897) isRS485HeaderFound = true;  //Do we have a match?
+  }
+
+  if (isRS485HeaderFound && SerialRS485.available() >= 6) {
+    //We have all data, reset for next time
+    isRS485HeaderFound = false;
+
+    uint8_t id = SerialRS485.read();
+    uint8_t b1 = SerialRS485.read();
+    uint8_t b2 = SerialRS485.read();
+    uint8_t b3 = SerialRS485.read();
+    uint8_t b4 = SerialRS485.read();
+    uint8_t receivedCksum = SerialRS485.read();
+
+    // Verify Checksum
+    uint8_t calculatedCksum = id + b1 + b2 + b3 + b4;
+
+    if (calculatedCksum == receivedCksum) {
+      // Success! Rebuild the long
+      if (id == 1) downforce1Raw = ((int32_t)b4 << 24) | ((int32_t)b3 << 16) | ((int32_t)b2 << 8) | b1;
+      if (id == 2) downforce2Raw = ((int32_t)b4 << 24) | ((int32_t)b3 << 16) | ((int32_t)b2 << 8) | b1;
+      if (id == 3) downforce3Raw = ((int32_t)b4 << 24) | ((int32_t)b3 << 16) | ((int32_t)b2 << 8) | b1;
+    }
+  }
+  /////////end of RS485 receiving//////////////////////
 }  // end of loop
 
 void CheckDataFromCAN() {

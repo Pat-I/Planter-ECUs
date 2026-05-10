@@ -96,7 +96,7 @@ uint8_t AOGtoCAN[288] = { 0 };  // Forces all elements to 0
 uint8_t AOGtoCANseq = 0;
 void EncodeAOGtoCAN(const uint8_t* data, uint8_t dataLen, bool isSentToAOG = true);  //to make the compiler happy, probably because of the optional argument
 
-///////main for the pop serial reading/////////////////////////////////////////////////////////
+///////for Weight serial reading/////////////////////////////////////////////////////////
 #define SerialRS485 Serial8
 uint8_t rs485RxBuffer[2048];
 uint8_t rs485TxBuffer[2048];
