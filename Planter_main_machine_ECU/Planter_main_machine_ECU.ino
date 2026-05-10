@@ -9,8 +9,8 @@ GND
 0 (ECU pin 25-53 IN) RX1 SerialPop
 1 (ECU pin 26-54 OUT) TX1 SerialPop
 2 (ECU pin 36)Pin9 digital input from PWR circuit ----on/off signal from tank pressure (compressor)
-3 (ECU pin 1)Pin1 output ----downforce raise pressure
-4 (ECU pin 29)Pin2 output ----downforce lower pressure
+3 (ECU pin 1)Pin1 output ----3downforce raise pressure
+4 (ECU pin 29)Pin2 output ----4downforce lower pressure
 5 (ECU pin 30)Pin3 output
 6 (ECU pin 31)Pin4 output
 7 (ECU pin 32)Pin5 output
@@ -71,6 +71,7 @@ extern float tempmonGetTemp(void);
 const uint8_t LOOP_TIME = 100;  // 10Hz
 uint32_t lastTime = LOOP_TIME;
 uint32_t currentTime = LOOP_TIME;
+uint8_t millisSectionStatus = 0;
 
 //EEPROM
 #include <EEPROM.h>
@@ -124,8 +125,8 @@ uint8_t serialCRC = 0;
 
 //define inputs and outputs
 //outputs
-#define DOWNFORCE_RAISE 1
-#define DOWNFORCE_LOWER 29
+#define DOWNFORCE_RAISE 3
+#define DOWNFORCE_LOWER 4
 
 //digital inputs
 #define COMPRESSOR 9
@@ -151,6 +152,8 @@ int32_t downforce2Raw = 0;
 int32_t downforce2Actual = 0;
 int32_t downforce3Raw = 0;
 int32_t downforce3Actual = 0;
+
+uint8_t ReceiveddownforceStatus = 0;
 
 uint16_t airPressureRaw = 0;
 uint32_t airPressurePSI = 0;
@@ -198,6 +201,13 @@ void setup() {
   //pinMode(BOUTON_DOWN, INPUT);
   pinMode(DOWNFORCE_RAISE, OUTPUT);
   pinMode(DOWNFORCE_LOWER, OUTPUT);
+  pinMode(5, OUTPUT);
+  pinMode(6, OUTPUT);
+  pinMode(7, OUTPUT);
+  pinMode(8, OUTPUT);
+  pinMode(9, OUTPUT);
+  pinMode(10, OUTPUT);
+
 
   //EEPROM
   EEPROM.get(0, EEread);  // read identifier
@@ -226,6 +236,15 @@ void loop() {
 
   if (currentTime - lastTime >= LOOP_TIME) {
     lastTime = currentTime;
+    millisSectionStatus++;
+
+    // check if a field is connected
+    if (millisSectionStatus > 120) {
+      millisSectionStatus = 0;  // wait to do it again if still no connection
+
+      digitalWrite(DOWNFORCE_LOWER, LOW);
+      digitalWrite(DOWNFORCE_RAISE, LOW);
+    }
 
     CanCheckOldArray();
 
@@ -319,7 +338,10 @@ void loop() {
     AOGtoCAN[9] = highByte(airPressureRaw);
     AOGtoCAN[10] = lowByte(airPressureRaw);
     AOGtoCAN[11] = airPressurePSI;
-    // no AOGtoCAN[12] yet----------------------------------------------------------------------------------------------------------------------------------------------------------------
+    uint8_t feedbackByte = 0;
+    if (digitalRead(DOWNFORCE_RAISE) == HIGH) feedbackByte |= (1 << 0);  // Bit 0
+    if (digitalRead(DOWNFORCE_LOWER) == HIGH) feedbackByte |= (1 << 1);  // Bit 1
+    AOGtoCAN[12] = feedbackByte;
     //do CRC
     crc = calculateCRC(AOGtoCAN, 13);
     AOGtoCAN[13] = crc;
@@ -400,6 +422,9 @@ void CheckDataFromCAN() {
         }
         //other here
         if (dataSrc == 123) {
+          if (dataPGN == 224) {
+            millisSectionStatus = 0;
+          }
           if (dataPGN == 161) {
             //7B A1 height config
             uint16_t temp = 0;
@@ -501,8 +526,10 @@ void CheckDataFromCAN() {
               if (divider != 0) settings.airPressureMulti = (10000L * temp - 5000L) / divider;
             }
 
-            //read the status byte---------------------------------------------------------------------------------------------------------------------------------------------------------
+            ReceiveddownforceStatus = globalBuffer[12];
             EEPROM.put(6, settings);
+            digitalWrite(DOWNFORCE_RAISE, (ReceiveddownforceStatus & (1 << 0)));
+            digitalWrite(DOWNFORCE_LOWER, (ReceiveddownforceStatus & (1 << 1)));
           }
         }
       }
